@@ -366,21 +366,44 @@ let saveTimer=null;
 function localPayload(){
   settings.currentLessonId=currentLessonId;
   settings.fontSize=fontSize; settings.lineHeight=lineHeight;
-  return {app:"405 國語課專用閱讀器",version:5,library,settings:{fontSize,lineHeight,currentLessonId},savedAt:new Date().toISOString()};
+  return {app:"405 國語課專用閱讀器",version:"5.1",library,settings:{fontSize,lineHeight,currentLessonId},savedAt:new Date().toISOString()};
 }
 async function refreshCloudUser(){
   const {data}=await cloud.auth.getUser(); cloudUser=data?.user||null; return cloudUser;
 }
+const CLOUD_REDIRECT="https://sanchongread-dotcom.github.io/405-chinese-reader/";
+async function resendSignupEmail(email){
+  const {error}=await cloud.auth.resend({type:"signup",email,options:{emailRedirectTo:CLOUD_REDIRECT}});
+  if(error){alert("重新寄送驗證信失敗："+error.message);return false;}
+  alert("新的驗證信已寄出。\n\n請只點最新一封信裡的驗證連結；完成後會回到 405 國語課閱讀器。\n原本課文仍安全留在本機。");
+  return true;
+}
 async function cloudLogin(){
   await refreshCloudUser();
   if(cloudUser) return true;
-  const email=prompt("雲端帳號 Email："); if(!email)return false;
-  const password=prompt("雲端密碼（至少 6 碼；第一次會建立帳號）："); if(!password)return false;
+  const email=(prompt("雲端帳號 Email：")||"").trim(); if(!email)return false;
+  const password=prompt("雲端密碼（至少 6 碼）："); if(!password)return false;
   let r=await cloud.auth.signInWithPassword({email,password});
-  if(r.error){
-    r=await cloud.auth.signUp({email,password,options:{emailRedirectTo:"https://sanchongread-dotcom.github.io/405-chinese-reader/"}});
-    if(r.error){alert("登入／建立帳號失敗："+r.error.message);return false;}
-    if(!r.data.session){alert("已建立帳號。請到信箱確認 Email，再回到閱讀器登入一次。\n\n在確認前，原本資料仍安全留在這台電腦。");return false;}
+  if(!r.error){await refreshCloudUser();return !!cloudUser;}
+
+  const msg=(r.error.message||"").toLowerCase();
+  if(msg.includes("email not confirmed") || msg.includes("email_not_confirmed")){
+    if(confirm("這個帳號還沒完成 Email 驗證。\n\n要現在重新寄一封新的驗證信嗎？")) await resendSignupEmail(email);
+    return false;
+  }
+
+  if(msg.includes("invalid login credentials")){
+    const create=confirm("目前無法登入。\n\n如果這是第一次使用這個 Email，按「確定」建立雲端帳號；如果你已經註冊過，按「取消」並確認密碼是否正確。");
+    if(!create)return false;
+    r=await cloud.auth.signUp({email,password,options:{emailRedirectTo:CLOUD_REDIRECT}});
+    if(r.error){alert("建立帳號失敗："+r.error.message);return false;}
+    if(!r.data.session){
+      alert("帳號已建立／等待驗證。接著會重新寄送一封驗證信。");
+      await resendSignupEmail(email);
+      return false;
+    }
+  }else{
+    alert("登入失敗："+r.error.message);return false;
   }
   await refreshCloudUser(); return !!cloudUser;
 }
