@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>朗讀釣魚島</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&display=swap">
+<style>
+/* Layout: one narrow "stage" column; a 3-step strip on top, one panel at a time, a persistent time-bank badge. Single dark pixel look by choice. */
+:root{
+  --ink:#0a1830; --deep:#102f56; --sea:#1a5a96; --foam:#cdeeff; --sun:#ffd23f; --coral:#ff6b4a;
+  --text:#eaf6ff; --mute:#9bbbd8; --good:#5ee08a; --bad:#ff7b7b; --line:#000;
+  --f-d:"DotGothic16","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
+  --f-n:"Press Start 2P","Courier New",monospace;
+  --f-b:"PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--ink); color:var(--text); font-family:var(--f-b); font-size:16px; line-height:1.6;
+  padding-block:14px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-d);font-size:1.9rem;margin:0;color:var(--sun);letter-spacing:.08em;text-shadow:3px 3px 0 #000}
+h2{font-family:var(--f-d);font-size:1.5rem;margin:4px 0 8px;color:var(--foam);text-wrap:balance}
+.bank{border:4px solid var(--line);background:var(--deep);padding:6px 12px;display:flex;align-items:center;gap:10px;box-shadow:4px 4px 0 #000a}
+.bank span{font-size:.85rem;color:var(--mute)}
+.bank b{font-family:var(--f-n);font-size:1rem;color:var(--sun);font-variant-numeric:tabular-nums}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.steps li{font-family:var(--f-d);text-align:center;padding:6px 4px;background:#0d2447;border:3px solid #1c3f6e;color:var(--mute)}
+.steps li.on{background:var(--sun);color:var(--ink);border-color:#000}
+.steps li.done{color:var(--good);border-color:var(--good)}
+.panel{background:var(--deep);border:4px solid var(--foam);box-shadow:6px 6px 0 #000a;padding:18px;min-width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row.end{justify-content:flex-end;margin-top:12px}
+label{color:var(--mute);font-size:.9rem}
+select,input{font:inherit;color:var(--text);background:#0a2142;border:3px solid var(--foam);padding:6px 10px;border-radius:0;min-width:0}
+.passage{white-space:pre-wrap;font-size:1.3rem;line-height:2.1;letter-spacing:.08em;margin:6px 0 14px;background:#0a2142;border:3px solid #1c3f6e;padding:14px 16px;max-width:100%}
+.rounds{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;color:var(--mute)}
+#dots{display:inline-flex;gap:6px}
+.dot{width:18px;height:18px;border:3px solid var(--foam);background:transparent}
+.dot.on{background:var(--sun);border-color:#000}
+.live{min-height:3.4em;background:#07162c;border:3px dashed #2b5d93;padding:8px 12px;margin-bottom:12px;color:var(--mute);overflow-wrap:anywhere}
+.live.hot{color:var(--text);border-color:var(--coral)}
+.btn{font-family:var(--f-d);font-size:1.05rem;color:var(--ink);background:var(--sun);border:4px solid #000;box-shadow:0 4px 0 #a07800;padding:9px 16px;cursor:pointer;border-radius:0}
+.btn:active:not([disabled]){transform:translateY(3px);box-shadow:0 1px 0 #a07800}
+.btn.alt{background:var(--foam);box-shadow:0 4px 0 #5f8fb0}
+.btn.rec{background:var(--coral);box-shadow:0 4px 0 #9a3320;color:#fff}
+.btn.sm{padding:4px 12px;font-size:.95rem}
+.btn[disabled]{background:#3d5069;color:#8aa0b8;box-shadow:0 4px 0 #26344a;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,canvas:focus-visible{outline:3px dashed var(--sun);outline-offset:3px}
+.msg{min-height:1.6em;margin:10px 0 0;font-size:.98rem}
+.msg.good{color:var(--good)} .msg.bad{color:var(--bad)}
+details{margin-top:12px;border:3px solid #1c3f6e;padding:8px 12px;background:#0a2142}
+summary{cursor:pointer;color:var(--mute)}
+details .row{margin-top:8px}
+.qhead{display:flex;justify-content:space-between;gap:10px;color:var(--mute);font-size:.95rem}
+.opts{display:grid;gap:10px;margin-top:10px}
+.opt{font-family:var(--f-d);font-size:1.15rem;text-align:left;color:var(--text);background:#0a2142;border:4px solid var(--foam);padding:10px 14px;cursor:pointer;border-radius:0}
+.opt:hover:not([disabled]){background:#143a6b}
+.opt.good{background:#1d6b3c;border-color:var(--good)}
+.opt.bad{background:#7a2a2a;border-color:var(--bad)}
+.opt[disabled]{cursor:default}
+.hud{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:8px;font-family:var(--f-d)}
+.hud b{font-family:var(--f-n);font-size:.95rem;color:var(--sun);font-variant-numeric:tabular-nums;margin-left:4px}
+.hud .btn{margin-left:auto}
+#cv{display:block;width:100%;max-width:100%;aspect-ratio:4/3;image-rendering:pixelated;border:4px solid #000;background:#2a7cc4;touch-action:manipulation;cursor:pointer}
+.hint{margin:8px 0 0;color:var(--mute);font-size:.92rem}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 0;padding:0;list-style:none;font-size:.88rem;color:var(--mute)}
+.legend li{display:flex;align-items:center;gap:6px}
+.legend canvas{image-rendering:pixelated}
+.big{font-family:var(--f-n);font-size:1.6rem;color:var(--sun);margin:8px 0;font-variant-numeric:tabular-nums}
+.tally{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 14px;padding:0;list-style:none}
+.teacher textarea{width:100%;min-height:9em;font:13px/1.5 ui-monospace,Menlo,monospace;color:var(--text);background:#07162c;border:3px solid var(--foam);padding:8px;border-radius:0}
+.teacher p{margin:6px 0;color:var(--mute);font-size:.9rem}
+@media (prefers-reduced-motion:reduce){.btn:active:not([disabled]){transform:none}}
+@media (max-width:480px){h1{font-size:1.5rem}.passage{font-size:1.15rem}}
+</style>
+</head>
+<body>
+
+<main class="wrap">
+  <header class="top">
+    <h1>朗讀釣魚島</h1>
+    <div class="bank" title="朗讀換來的遊戲時間"><span>遊戲時間</span><b id="bankTime">0:00</b></div>
+  </header>
+  <ol class="steps" id="steps">
+    <li data-s="read" class="on">1 朗讀</li><li data-s="quiz">2 測驗</li><li data-s="game">3 釣魚</li>
+  </ol>
+
+  <section id="s-read" class="panel">
+    <div class="row"><label for="lessonSel">課文</label><select id="lessonSel"></select></div>
+    <h2 id="lTitle"></h2>
+    <p class="passage" id="lText"></p>
+    <div class="rounds"><span>朗讀次數</span><span id="dots"></span><span id="roundTxt"></span></div>
+    <div class="live" id="live" aria-live="polite"></div>
+    <div class="row">
+      <button class="btn rec" id="btnStart">● 開始朗讀</button>
+      <button class="btn alt" id="btnDone" disabled>完成這一遍</button>
+    </div>
+    <p class="msg" id="readMsg" aria-live="polite"></p>
+    <details id="helper">
+      <summary>家長確認（收不到音、或沒有麥克風時使用）</summary>
+      <div class="row">
+        <input id="pinRead" type="password" inputmode="numeric" autocomplete="off" placeholder="家長密碼" aria-label="家長密碼">
+        <button class="btn alt sm" id="btnTeacher">家長確認一遍</button>
+      </div>
+    </details>
+    <div class="row end"><button class="btn" id="btnToQuiz" disabled>開始閱讀測驗 ▶</button></div>
+  </section>
+
+  <section id="s-quiz" class="panel" hidden>
+    <div class="qhead"><span id="qNo"></span><span id="qBank"></span></div>
+    <h2 id="qText"></h2>
+    <div class="opts" id="opts"></div>
+    <p class="msg" id="qMsg" aria-live="polite"></p>
+    <div class="row end"><button class="btn" id="btnNext" hidden>下一題 ▶</button></div>
+  </section>
+
+  <section id="s-game" hidden>
+    <div class="hud">
+      <div>時間<b id="hTime">0:00</b></div>
+      <div>分數<b id="hScore">0</b></div>
+      <button class="btn alt sm" id="btnPause">暫停</button>
+    </div>
+    <canvas id="cv" width="400" height="300" tabindex="0" aria-label="釣魚遊戲畫面，點一下或按空白鍵放下釣鉤"></canvas>
+    <p class="hint">點一下畫面或按空白鍵放下釣鉤。釣起河豚會爆炸，把附近的垃圾炸掉；釣到章魚，海底會黑五秒；寶箱藏著驚喜。</p>
+    <ul class="legend" id="legend"></ul>
+  </section>
+
+  <section id="s-end" class="panel" hidden>
+    <h2 id="endTitle">遊戲結束</h2>
+    <div class="big" id="endScore">0</div>
+    <p id="endBest"></p>
+    <ul class="tally" id="tally"></ul>
+    <div class="row"><button class="btn" id="btnAgain">再讀一課，賺更多時間</button></div>
+  </section>
+
+  <details class="teacher" id="teacher">
+    <summary>教師設定</summary>
+    <div id="tLock" class="row">
+      <input id="pinT" type="password" inputmode="numeric" autocomplete="off" placeholder="管理密碼" aria-label="管理密碼">
+      <button class="btn alt sm" id="btnUnlock">解鎖</button>
+      <span class="msg" id="tMsg"></span>
+    </div>
+    <div id="tBody" hidden>
+      <p>課文與題目（JSON）。每題的 o 是選項，a 是正確選項的編號（從 0 開始）。套用後只存在這台瀏覽器，不會傳給學生。要改全班的課文，請更換網站檔案。</p>
+      <textarea id="lessonJson" spellcheck="false" aria-label="課文 JSON"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn alt sm" id="btnApply">套用課文</button>
+        <button class="btn alt sm" id="btnReset">還原範例課文</button>
+      </div>
+      <p class="msg" id="tMsg2"></p>
+    </div>
+  </details>
+</main>
+<script>
+"use strict";
+const PIN = "2468"; // 家長／老師確認密碼
+const $ = s => document.querySelector(s);
+const ls = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+const SAMPLE = [
+ {
+  "title": "第八課　建築界的長頸鹿",
+  "text": "假如把建築物想像成動物，「居高臨下」的大樓就是建築界的「長頸鹿」。這些建築不但有重要的功能與特色，更成為一座城市的特有景觀。現在，我們來認識世界上幾座著名的「長頸鹿」。\n　　位於臺北市的台北一○一大樓，外形有如一節一節的竹子，層層向上開展，代表經濟節節高升。大樓外層有巨大的古錢圖案，代表它是重要的「金融中心」。大樓裡面安裝了一座阻尼器，使它能避免地震與強風所造成的搖晃。每年的跨年煙火秀，台北一○一大樓陪著大家迎接新年，更讓全世界認識臺灣。\n　　西元二○一二年完工的東京晴空塔，又名「東京天空樹」。塔的底部為三角形，往上漸漸轉變為圓形。塔身在白色裡加了一些青色，讓這融入藍天的「晴空塔白」散發著耀眼的光芒。這座電波通訊塔，最初是為了改善城市收訊不良而興建。現在，從這裡發展出完整的都市開發計畫，也為當地帶來了可觀的商機。\n　　吉隆坡的雙峰塔是座雙生大樓，層層的八角形，在陽光下閃閃發亮。這座大型商場在四十一與四十二層樓之間，有一座長五十八公尺的「人字形」連通橋，方便人們往來。雙峰塔是吉隆坡最亮眼的建築，為這座城市帶來美麗而難忘的剪影。\n　　具有多功能及特色的建築，不但受人注目，更點亮了一整座城市。這些建築界的「長頸鹿」散發著光芒，希望更多來自四面八方的朋友，感受當地的文化與民情，留下美好難忘的印象。",
+  "quiz": [
+   {
+    "q": "下列哪一組語詞的國字完全正確？",
+    "o": [
+     "金榮中心、阻尼器",
+     "金融中心、祖尼器",
+     "金融中心、阻尼器",
+     "金容中心、阻泥器"
+    ],
+    "a": 2
+   },
+   {
+    "q": "「居高臨下」的「臨」讀音為何？",
+    "o": [
+     "ㄌㄧㄣˊ",
+     "ㄌㄧㄥˊ",
+     "ㄌㄧㄣˋ",
+     "ㄌㄧㄥˋ"
+    ],
+    "a": 0
+   },
+   {
+    "q": "「經濟」的「濟」讀音為何？",
+    "o": [
+     "ㄐㄧˇ",
+     "ㄑㄧˋ",
+     "ㄐㄧˊ",
+     "ㄐㄧˋ"
+    ],
+    "a": 3
+   },
+   {
+    "q": "「地震造成大樓搖晃」中，哪一個字與「震」同樣具有雨字頭？",
+    "o": [
+     "振",
+     "雷",
+     "晨",
+     "辰"
+    ],
+    "a": 1
+   },
+   {
+    "q": "「居高臨下」在本文中的意思是什麼？",
+    "o": [
+     "從低處向上仰望",
+     "從遠處觀看城市",
+     "處於高處，俯視下方",
+     "在高處向上攀爬"
+    ],
+    "a": 2
+   },
+   {
+    "q": "「經濟節節高升」的「節節高升」表示什麼？",
+    "o": [
+     "維持原有的情況",
+     "逐步提升、愈來愈好",
+     "突然下降",
+     "反覆回到原點"
+    ],
+    "a": 1
+   },
+   {
+    "q": "「可觀的商機」中的「可觀」最接近哪個意思？",
+    "o": [
+     "可以站在旁邊觀看",
+     "外表十分美麗",
+     "可以預先看見",
+     "相當多，值得重視"
+    ],
+    "a": 3
+   },
+   {
+    "q": "「商機」在文中指的是什麼？",
+    "o": [
+     "商業發展及獲利的機會",
+     "商店使用的機器",
+     "大樓內的通訊設備",
+     "商場的建築外形"
+    ],
+    "a": 0
+   },
+   {
+    "q": "「四面八方」在文中指什麼？",
+    "o": [
+     "四座高樓的八個角",
+     "各個方向、各地",
+     "商場的八個出口",
+     "城市的四條主要道路"
+    ],
+    "a": 1
+   },
+   {
+    "q": "本文主要介紹什麼？",
+    "o": [
+     "三座高樓的特色、功能及城市意義",
+     "各國高樓的施工過程",
+     "三座城市的交通路線",
+     "世界各地的動物習性"
+    ],
+    "a": 0
+   },
+   {
+    "q": "台北一○一的阻尼器主要有什麼作用？",
+    "o": [
+     "改善城市收訊",
+     "連接兩座大樓",
+     "減少地震與強風造成的搖晃",
+     "增加大樓的照明"
+    ],
+    "a": 2
+   },
+   {
+    "q": "東京晴空塔最初興建的目的是什麼？",
+    "o": [
+     "舉辦跨年煙火秀",
+     "提供雙塔間的通道",
+     "象徵金融中心",
+     "改善城市收訊不良"
+    ],
+    "a": 3
+   },
+   {
+    "q": "東京晴空塔的外形由底部往上如何改變？",
+    "o": [
+     "由圓形漸漸轉為三角形",
+     "由三角形漸漸轉為圓形",
+     "由八角形漸漸轉為方形",
+     "由方形漸漸轉為八角形"
+    ],
+    "a": 1
+   },
+   {
+    "q": "吉隆坡雙峰塔的連通橋位在哪裡？",
+    "o": [
+     "三十一與三十二層樓之間",
+     "五十八與五十九層樓之間",
+     "四十一與四十二層樓之間",
+     "大樓的一樓與二樓之間"
+    ],
+    "a": 2
+   },
+   {
+    "q": "下列建築與特色的配對何者正確？",
+    "o": [
+     "雙峰塔——雙生大樓與連通橋",
+     "晴空塔——竹節外形與古錢圖案",
+     "台北一○一——三角形漸變成圓形",
+     "雙峰塔——改善電波收訊"
+    ],
+    "a": 0
+   },
+   {
+    "q": "本文是哪一種文體？判斷的依據是什麼？",
+    "o": [
+     "記敘文，記錄作者遊覽的經過",
+     "抒情文，抒發旅遊感受",
+     "說明文，介紹建築的特色與功能",
+     "議論文，主張興建高樓"
+    ],
+    "a": 2
+   },
+   {
+    "q": "甲、分別介紹三座建築；乙、說明高樓對城市的意義與期待；丙、以長頸鹿引出高樓的共同特色。請依文章內容排序。",
+    "o": [
+     "甲乙丙",
+     "乙甲丙",
+     "丙乙甲",
+     "丙甲乙"
+    ],
+    "a": 3
+   },
+   {
+    "q": "本文的篇章結構為何？",
+    "o": [
+     "分說—總說—分說",
+     "總說—分說—總結",
+     "總說—總結—分說",
+     "分說—分說—分說"
+    ],
+    "a": 1
+   },
+   {
+    "q": "第二至第四段在全文中具有什麼作用？",
+    "o": [
+     "分別舉例說明第一段提到的高樓特色與功能",
+     "交代作者旅行的時間順序",
+     "提出反對興建高樓的理由",
+     "重複第一段的所有內容"
+    ],
+    "a": 0
+   },
+   {
+    "q": "作者將高樓稱為建築界的「長頸鹿」，主要是運用哪種修辭？",
+    "o": [
+     "排比",
+     "設問",
+     "誇飾",
+     "譬喻"
+    ],
+    "a": 3
+   },
+   {
+    "q": "台北一○一的竹節外形與古錢圖案有何共同意義？",
+    "o": [
+     "都與經濟或金融有關",
+     "都為了改善收訊",
+     "都為了吸引鳥類",
+     "都能減少地震造成的搖晃"
+    ],
+    "a": 0
+   },
+   {
+    "q": "介紹連通橋時，寫出「五十八公尺」有何作用？",
+    "o": [
+     "表達作者害怕高處的心情",
+     "用具體數字讓說明更清楚",
+     "強調橋的顏色",
+     "比較兩座城市的人口"
+    ],
+    "a": 1
+   },
+   {
+    "q": "「不但受人注目，更點亮了一整座城市」中的「點亮」主要想表達什麼？",
+    "o": [
+     "建築提供所有家庭電力",
+     "建築讓城市整夜都不用關燈",
+     "建築使城市更有特色與吸引力",
+     "建築的功能只有照明"
+    ],
+    "a": 2
+   },
+   {
+    "q": "第一段與最後一段都提到「建築界的長頸鹿」，這樣安排有何作用？",
+    "o": [
+     "改變文章介紹的主題",
+     "交代三座建築的高度排序",
+     "說明長頸鹿的生活習性",
+     "首尾呼應，強化全文主旨"
+    ],
+    "a": 3
+   },
+   {
+    "q": "從三座建築的介紹中，可以推論作者最想傳達哪個觀點？",
+    "o": [
+     "建築越高就一定越有商業價值",
+     "建築的價值不只在高度，也在功能與文化意義",
+     "所有高樓都應設計成相同外形",
+     "城市只要興建高樓就不必發展其他設施"
+    ],
+    "a": 1
+   }
+  ]
+ },
+ {
+  "title": "夜市的燈",
+  "text": "天一黑，夜市的燈一盞一盞亮了起來。賣烤玉米的阿伯把爐火搧旺，香味飄得好遠。套圈圈的攤位前擠滿了小朋友，大家睜大眼睛，屏住呼吸，圈圈一飛出去，就聽見一陣歡呼。妹妹手裡捧著熱呼呼的豆花，哥哥拿著剛撈到的小金魚。媽媽說：「慢慢走，別擠散了。」我緊緊牽著媽媽的手，覺得夜市像一個發光的大寶盒，每走一步，都有新的驚喜。",
+  "quiz": [
+   {
+    "q": "夜市的燈是什麼時候亮起來的？",
+    "o": [
+     "天一黑",
+     "中午",
+     "下大雨時",
+     "天剛亮"
+    ],
+    "a": 0
+   },
+   {
+    "q": "賣烤玉米的阿伯做了什麼？",
+    "o": [
+     "把爐火搧旺",
+     "把攤子收起來",
+     "大聲唱歌",
+     "送玉米給大家"
+    ],
+    "a": 0
+   },
+   {
+    "q": "套圈圈的攤位前擠滿了誰？",
+    "o": [
+     "小朋友",
+     "老師",
+     "警察",
+     "觀光客"
+    ],
+    "a": 0
+   },
+   {
+    "q": "哥哥手上拿著什麼？",
+    "o": [
+     "剛撈到的小金魚",
+     "熱呼呼的豆花",
+     "烤玉米",
+     "套圈圈的獎品"
+    ],
+    "a": 0
+   },
+   {
+    "q": "「我」覺得夜市像什麼？",
+    "o": [
+     "發光的大寶盒",
+     "安靜的圖書館",
+     "大大的操場",
+     "黑黑的山洞"
+    ],
+    "a": 0
+   }
+  ]
+ }
+];
+function validLessons(arr) {
+  return Array.isArray(arr) && arr.length > 0 && arr.every(l =>
+    l && typeof l.title === "string" && l.title && typeof l.text === "string" && l.text.length > 5 &&
+    Array.isArray(l.quiz) && l.quiz.length > 0 && l.quiz.every(q =>
+      q && typeof q.q === "string" && Array.isArray(q.o) && q.o.length >= 2 && q.o.every(x => typeof x === "string") &&
+      Number.isInteger(q.a) && q.a >= 0 && q.a < q.o.length));
+}
+let LESSONS = (() => { const s = ls.get("lessons", null); return validLessons(s) ? s : SAMPLE; })();
+
+const MAX_ROUNDS = 5, SEC_PER_ROUND = 60, PENALTY = 20, PASS = 0.6;
+const S = { lesson: 0, rounds: 0, bank: 0, qi: 0, order: [], score: 0, caught: {}, ready: false };
+const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const setMsg = (el, t, cls) => { el.textContent = t || ""; el.className = "msg" + (cls ? " " + cls : ""); };
+
+function show(id) {
+  ["read", "quiz", "game", "end"].forEach(k => { $("#s-" + k).hidden = k !== id; });
+  const order = ["read", "quiz", "game"], at = order.indexOf(id === "end" ? "game" : id);
+  document.querySelectorAll("#steps li").forEach(li => {
+    const i = order.indexOf(li.dataset.s);
+    li.className = id === "end" ? "done" : i === at ? "on" : i < at ? "done" : "";
+  });
+  window.scrollTo(0, 0);
+}
+function drawBank() { $("#bankTime").textContent = fmt(S.bank); }
+
+/* ---------- Reading ---------- */
+const norm = s => (s || "").replace(/[^一-鿿A-Za-z0-9]/g, "");
+function lcsRatio(target, heard) {
+  const a = norm(target), b = norm(heard);
+  if (!a.length || !b.length) return 0;
+  let prev = new Array(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = new Array(b.length + 1).fill(0);
+    for (let j = 1; j <= b.length; j++)
+      cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    prev = cur;
+  }
+  return prev[b.length] / a.length;
+}
+let dict = null, heard = "", partial = "", listening = false;
+
+function drawRounds() {
+  $("#dots").innerHTML = Array.from({ length: MAX_ROUNDS }, (_, i) => `<i class="dot${i < S.rounds ? " on" : ""}"></i>`).join("");
+  $("#roundTxt").textContent = `${S.rounds} / ${MAX_ROUNDS} 遍，換到 ${S.rounds} 分鐘`;
+  $("#btnToQuiz").disabled = S.rounds < 1;
+  $("#btnStart").disabled = S.rounds >= MAX_ROUNDS || listening;
+  drawBank();
+}
+function drawLive() {
+  const el = $("#live");
+  const t = (heard + partial).trim();
+  el.className = "live" + (listening ? " hot" : "");
+  el.textContent = t || (listening ? "聽著呢，請開始唸…" : S.rounds >= MAX_ROUNDS ? "已經讀滿 5 遍，換到最多 5 分鐘囉！" : "按「開始朗讀」，把整篇課文大聲唸出來。");
+}
+function loadLesson(i) {
+  S.lesson = i; S.rounds = 0; S.bank = 0; heard = ""; partial = "";
+  const L = LESSONS[i];
+  $("#lTitle").textContent = "〈" + L.title + "〉";
+  $("#lText").textContent = L.text;
+  setMsg($("#readMsg"), "");
+  drawRounds(); drawLive();
+}
+function passRound(how) {
+  S.rounds++; S.bank += SEC_PER_ROUND;
+  setMsg($("#readMsg"), `第 ${S.rounds} 遍通過${how || ""}！遊戲時間 +1 分鐘${S.rounds >= MAX_ROUNDS ? "，已達上限" : ""}。`, "good");
+  heard = ""; partial = ""; drawRounds(); drawLive();
+}
+function startReading() {
+  setMsg($("#readMsg"), "");
+  if (!dict) { setMsg($("#readMsg"), "這裡無法收音驗證，請家長在下方協助確認這一遍。", "bad"); $("#helper").open = true; return; }
+  heard = ""; partial = "";
+  // start() must run straight from the click, before anything is awaited
+  dict.start({ language: "zh-TW" }).catch(e => {
+    const c = e && e.code;
+    if (c === "not_granted") setMsg($("#readMsg"), "需要允許麥克風才能驗證朗讀。可以請家長協助確認。", "bad");
+    else if (c === "unavailable") { setMsg($("#readMsg"), "這台裝置無法辨識中文朗讀，請家長協助確認。", "bad"); $("#helper").open = true; }
+    else if (c !== "stopped" && c !== "dismissed") setMsg($("#readMsg"), "收音失敗，請再按一次。", "bad");
+  });
+}
+async function finishReading() {
+  $("#btnDone").disabled = true;
+  try { await dict.stop(); } catch (e) {}
+  judge();
+}
+function judge() {
+  const text = (heard + partial).trim();
+  const r = lcsRatio(LESSONS[S.lesson].text, text);
+  if (r >= PASS) passRound();
+  else {
+    setMsg($("#readMsg"), text ? `只聽到課文的 ${Math.round(r * 100)}%，要唸出至少 ${Math.round(PASS * 100)}% 才算一遍。請再唸一次，聲音大一點。` : "沒有聽到聲音，請確認麥克風後再試一次。", "bad");
+    heard = ""; partial = ""; drawLive();
+  }
+  drawRounds();
+}
+function teacherConfirm() {
+  if ($("#pinRead").value !== PIN) { setMsg($("#readMsg"), "密碼不對。", "bad"); return; }
+  $("#pinRead").value = "";
+  if (S.rounds >= MAX_ROUNDS) { setMsg($("#readMsg"), "已經讀滿 5 遍。", ""); return; }
+  passRound("（家長確認）");
+}
+
+/* ---------- Quiz ---------- */
+function startQuiz() {
+  S.qi = 0; S.order = shuffle(LESSONS[S.lesson].quiz.map((_, i) => i));
+  show("quiz"); drawQuestion();
+}
+function drawQuestion() {
+  const Q = LESSONS[S.lesson].quiz[S.order[S.qi]];
+  $("#qNo").textContent = `第 ${S.qi + 1} 題 / 共 ${S.order.length} 題`;
+  $("#qBank").textContent = `遊戲時間 ${fmt(S.bank)}`;
+  $("#qText").textContent = Q.q;
+  setMsg($("#qMsg"), `答錯一題扣 ${PENALTY} 秒。`);
+  $("#btnNext").hidden = true;
+  const box = $("#opts"); box.innerHTML = "";
+  shuffle(Q.o.map((t, i) => ({ t, ok: i === Q.a }))).forEach(o => {
+    const b = document.createElement("button");
+    b.className = "opt"; b.textContent = o.t; b.dataset.ok = o.ok ? "1" : "";
+    b.addEventListener("click", () => answer(b, o.ok));
+    box.appendChild(b);
+  });
+}
+function answer(btn, ok) {
+  document.querySelectorAll(".opt").forEach(b => { b.disabled = true; if (b.dataset.ok) b.classList.add("good"); });
+  if (ok) setMsg($("#qMsg"), "答對了！", "good");
+  else {
+    btn.classList.add("bad");
+    const before = S.bank; S.bank = Math.max(0, S.bank - PENALTY);
+    setMsg($("#qMsg"), `答錯了，扣 ${before - S.bank} 秒。正確答案是綠色的選項。`, "bad");
+  }
+  drawBank(); $("#qBank").textContent = `遊戲時間 ${fmt(S.bank)}`;
+  const last = S.qi >= S.order.length - 1;
+  $("#btnNext").textContent = last ? "完成測驗 ▶" : "下一題 ▶";
+  $("#btnNext").hidden = false; $("#btnNext").focus();
+}
+function nextQuestion() {
+  if (S.qi < S.order.length - 1) { S.qi++; drawQuestion(); return; }
+  if (S.bank <= 0) { endGame(true); return; }
+  startGame();
+}
+/* ---------- Pixel sprites ---------- */
+function mk(map, pal, c) {
+  const h = map.length, w = Math.max(...map.map(r => r.length));
+  const cv = document.createElement("canvas"); cv.width = w * c; cv.height = h * c;
+  const x = cv.getContext("2d");
+  map.forEach((r, j) => [...r].forEach((ch, i) => { const col = pal[ch]; if (col) { x.fillStyle = col; x.fillRect(i * c, j * c, c, c); } }));
+  return cv;
+}
+const MAPS = {
+  fish: ["...oooo....", "..oooooo..o", ".okoooooooo", "..oobbbb..o", "...oooo...."],
+  lantern: ["....y.......", "....y.oooo..", "..oooooooo.o", ".okoooooooo.", "..ooddddoo.o", "...oooooo..."],
+  gold: ["....ooooooo......", "..ooooooooooo..oo", ".okoooooooooooooo", "oooooooooooooo.oo", ".oobbbbbbbbooo..o", "..oooooooooo....."],
+  puff: ["..s.oo.s..", ".oooooooo.", "sokooooos.", "oooooooooo", "obbbbbbbbo", ".oooooooo.", "..s.oo.s.."],
+  octo: ["...oooooo...", "..oooooooo..", ".oooooooooo.", ".owwoooowwo.", ".okkoooookko.", ".oooooooooo.", "..oooooooo..", ".o.oo..oo.o.", "o..o....o..o", "o.o......o.o"],
+  boot: ["..bbbb..", "..bbbb..", "..bbbb..", "..bbbb..", "..bbbbbb", ".bbbbbbb", "bbbbbbbb", "dddddddd"],
+  can: [".ggggg.", "sssssss", "ggggggg", "gdgdgdg", "ggggggg", "gdgdgdg", "ggggggg", "sssssss", ".ggggg."],
+  chest: ["..dddddddd..", ".dbbbbbbbbd.", "dbbbbbbbbbbd", "dddddddddddd", "dbbbbyybbbbd", "dbbbbyybbbbd", "dbbbbbbbbbbd", "dddddddddddd"]
+};
+const P = (o, b, extra) => Object.assign({ o, b, k: "#0b1220", d: "#12243a", w: "#ffffff", y: "#ffd23f", s: "#e8f3ff", g: "#8d9aa8" }, extra || {});
+const T = {
+  f1: { n: "小魚", spr: "fish", pal: P("#ff9f43", "#ffe0a3"), pts: 10, wt: 1, spd: .45, cnt: 5 },
+  f2: { n: "藍魚", spr: "fish", pal: P("#3fa7ff", "#bfe3ff"), pts: 25, wt: 1.3, spd: .65, cnt: 3 },
+  f3: { n: "燈籠魚", spr: "lantern", pal: P("#7a5bd6", "#c9b8ff", { y: "#fff27a" }), pts: 60, wt: 1.9, spd: .35, cnt: 2 },
+  f4: { n: "黃金魚", spr: "gold", pal: P("#ffc928", "#fff0a0", { d: "#b07a00" }), pts: 200, wt: 3, spd: .55, cnt: 1, deep: 1 },
+  pf: { n: "河豚", spr: "puff", pal: P("#e8c75a", "#fff5c8", { s: "#ff6b4a" }), pts: 30, wt: 1.4, spd: .3, cnt: 2, note: "爆炸清垃圾" },
+  oc: { n: "章魚", spr: "octo", pal: P("#a64ac9", "#d9a6ee"), pts: 20, wt: 2, spd: .25, cnt: 1, note: "噴墨變黑" },
+  ch: { n: "寶箱", spr: "chest", pal: P("#9a5a22", "#9a5a22", { d: "#4a2c12", b: "#9a5a22" }), pts: 0, wt: 2.3, spd: 0, note: "隨機獎勵" },
+  t1: { n: "靴子", spr: "boot", pal: P("#7a5230", "#7a5230", { b: "#7a5230", d: "#3e2a18" }), pts: 0, wt: 3.4, spd: 0, trash: 1, note: "垃圾" },
+  t2: { n: "罐頭", spr: "can", pal: P("#9aa7b4", "#9aa7b4", { d: "#5d6a78" }), pts: 0, wt: 3.4, spd: 0, trash: 1, note: "垃圾" }
+};
+for (const k in T) T[k].img = mk(MAPS[T[k].spr], T[k].pal, 2);
+(function legend() {
+  const ul = $("#legend");
+  ["f1", "f2", "f3", "f4", "pf", "oc", "ch", "t1"].forEach(k => {
+    const d = T[k], li = document.createElement("li"), c = document.createElement("canvas");
+    const sc = Math.min(1, 26 / d.img.width);
+    c.width = Math.max(1, Math.round(d.img.width * sc)); c.height = Math.max(1, Math.round(d.img.height * sc));
+    c.getContext("2d").drawImage(d.img, 0, 0, c.width, c.height);
+    li.appendChild(c);
+    li.appendChild(document.createTextNode(d.n + " " + (d.note && !d.pts ? d.note : d.pts + " 分" + (d.note ? "・" + d.note : ""))));
+    ul.appendChild(li);
+  });
+})();
+
+/* ---------- Fishing game ---------- */
+const cv = $("#cv"), g = cv.getContext("2d");
+g.imageSmoothingEnabled = false;
+const W = 400, H = 300, SEA = 52, OX = 200, OY = SEA - 22, MINLEN = 12;
+let G = null;
+
+function spawn(k) {
+  const d = T[k], w = d.img.width, h = d.img.height;
+  const lo = d.trash ? SEA + 80 : d.deep ? SEA + 120 : SEA + 28, hi = H - 20 - h / 2;
+  let x = 0, y = 0;
+  for (let n = 0; n < 12; n++) {
+    x = 16 + w / 2 + Math.random() * (W - 32 - w); y = lo + Math.random() * (hi - lo);
+    if (G.objs.every(o => Math.hypot(o.x - x, o.y - y) > 32)) break;
+  }
+  const v = d.spd ? (Math.random() < .5 ? -1 : 1) * d.spd * (0.8 + Math.random() * .5) : 0;
+  G.objs.push({ k, x, y, w, h, v, caught: false });
+}
+const count = pred => G.objs.filter(pred).length;
+function tip() { const h = G.hook; return { x: OX + Math.sin(h.ang) * h.len, y: OY + Math.cos(h.ang) * h.len }; }
+function boom(x, y, n) {
+  const cols = ["#fff", "#ffe45e", "#ff9f43", "#ff6b4a"];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.283, s = 30 + Math.random() * 90;
+    G.fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: .5 + Math.random() * .4, c: cols[i % 4] });
+  }
+}
+function note(x, y, s, c) { G.txt.push({ s, x: Math.max(40, Math.min(W - 40, x)), y, life: 1.4, c: c || "#ffe45e" }); }
+function gain(p, x, y) { S.score += p; $("#hScore").textContent = S.score; if (p) note(x, y, "+" + p); }
+function removeObj(o) { const i = G.objs.indexOf(o); if (i >= 0) G.objs.splice(i, 1); }
+
+function onCatch(o) {
+  const h = G.hook;
+  if (o.k === "pf") {
+    let n = 0;
+    G.objs.slice().forEach(t => { if (T[t.k].trash && Math.hypot(t.x - o.x, t.y - o.y) < 75) { boom(t.x, t.y, 14); removeObj(t); n++; } });
+    boom(o.x, o.y, 34); removeObj(o); h.obj = null;
+    S.caught.pf = (S.caught.pf || 0) + 1;
+    gain(T.pf.pts, o.x, o.y - 12);
+    note(o.x, o.y - 26, n ? "砰！炸掉 " + n + " 件垃圾" : "砰！", "#ff9f43");
+  } else if (o.k === "oc") {
+    G.ink = 5; note(o.x, o.y - 12, "章魚噴墨！", "#d9a6ee");
+  }
+}
+function reward(o) {
+  S.caught[o.k] = (S.caught[o.k] || 0) + 1;
+  const d = T[o.k], x = OX, y = SEA - 8;
+  if (d.trash) note(x, y, "是垃圾…", "#9bbbd8");
+  else if (o.k === "ch") {
+    const r = Math.floor(Math.random() * 3);
+    if (r === 0) { G.t += 10; note(x, y, "寶箱：遊戲時間 +10 秒！", "#5ee08a"); }
+    else if (r === 1) {
+      const trash = G.objs.filter(t => T[t.k].trash);
+      trash.forEach(t => { boom(t.x, t.y, 10); removeObj(t); });
+      note(x, y, "寶箱：垃圾全部清空！", "#5ee08a");
+    } else { gain(100, x, y); note(x, y - 12, "寶箱：大獎！", "#5ee08a"); }
+  } else gain(d.pts, x, y);
+  removeObj(o);
+}
+function update(dt) {
+  const h = G.hook, f = dt * 60;
+  G.t -= dt;
+  if (G.t <= 0) { G.t = 0; endGame(false); return; }
+  if (G.ink > 0) G.ink -= dt;
+  G.objs.forEach(o => {
+    if (o.caught || !o.v) return;
+    o.x += o.v * f;
+    if (o.x < o.w / 2 + 4) { o.x = o.w / 2 + 4; o.v = Math.abs(o.v); }
+    if (o.x > W - o.w / 2 - 4) { o.x = W - o.w / 2 - 4; o.v = -Math.abs(o.v); }
+  });
+  if (h.st === "swing") {
+    h.ang += h.dir * 0.022 * f; h.len = MINLEN;
+    if (Math.abs(h.ang) > 1.15) { h.dir *= -1; h.ang = Math.sign(h.ang) * 1.15; }
+  } else if (h.st === "out") {
+    h.len += 4.2 * f;
+    const p = tip();
+    const hit = G.objs.find(o => !o.caught && Math.abs(p.x - o.x) < o.w / 2 + 1 && Math.abs(p.y - o.y) < o.h / 2 + 2);
+    if (hit) { h.obj = hit; hit.caught = true; h.st = "back"; onCatch(hit); }
+    else if (p.x < 3 || p.x > W - 3 || p.y > H - 12) h.st = "back";
+  } else {
+    h.len -= (h.obj ? 4.2 / T[h.obj.k].wt : 5.5) * f;
+    if (h.obj) { const p = tip(); h.obj.x = p.x; h.obj.y = p.y + h.obj.h / 2 - 2; }
+    if (h.len <= MINLEN) { h.len = MINLEN; h.st = "swing"; if (h.obj) { const o = h.obj; h.obj = null; reward(o); } }
+  }
+  G.spawnT += dt; G.trashT += dt; G.chestT += dt;
+  if (G.spawnT > 1.5) {
+    G.spawnT = 0;
+    for (const k in T) if (T[k].cnt && count(o => o.k === k) < T[k].cnt) spawn(k);
+  }
+  if (G.trashT > 9) { G.trashT = 0; if (count(o => T[o.k].trash) < 8) spawn(Math.random() < .5 ? "t1" : "t2"); }
+  if (G.chestT > 14) { G.chestT = 0; if (!count(o => o.k === "ch")) spawn("ch"); }
+  G.fx.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; });
+  G.fx = G.fx.filter(p => p.life > 0);
+  G.txt.forEach(t => { t.y -= 18 * dt; t.life -= dt; });
+  G.txt = G.txt.filter(t => t.life > 0);
+  $("#hTime").textContent = fmt(G.t);
+}
+function draw() {
+  g.fillStyle = "#8fd8ff"; g.fillRect(0, 0, W, SEA);
+  g.fillStyle = "#fff";
+  [[40, 12, 30, 6], [50, 8, 16, 4], [290, 22, 36, 6], [300, 18, 18, 4]].forEach(r => g.fillRect(r[0], r[1], r[2], r[3]));
+  g.fillStyle = "#ffe45e"; g.fillRect(352, 8, 16, 16);
+  [["#2f86cf", SEA, 112], ["#2573b8", 112, 182], ["#1b5c9b", 182, 246], ["#144a82", 246, H]].forEach(b => { g.fillStyle = b[0]; g.fillRect(0, b[1], W, b[2] - b[1]); });
+  g.fillStyle = "#cdeeff";
+  for (let x = -12; x < W; x += 12) g.fillRect(x + ((G.tick >> 3) % 12), SEA, 6, 2);
+  g.fillStyle = "#e8c37a"; g.fillRect(0, H - 12, W, 12);
+  g.fillStyle = "#c9a15a"; for (let x = 4; x < W; x += 22) g.fillRect(x, H - 6, 3, 2);
+  g.fillStyle = "#3aa55b";
+  [24, 96, 172, 252, 330, 382].forEach(x => { g.fillRect(x, H - 34, 3, 22); g.fillRect(x + 3, H - 26, 3, 14); g.fillRect(x - 3, H - 22, 3, 10); });
+  g.globalAlpha = .35; g.fillStyle = "#fff";
+  for (let i = 0; i < 6; i++) g.fillRect(40 + i * 62, H - ((G.tick * .4 + i * 47) % (H - SEA)), 2, 2);
+  g.globalAlpha = 1;
+  G.objs.forEach(o => {
+    const im = T[o.k].img, x = Math.round(o.x - o.w / 2), y = Math.round(o.y - o.h / 2);
+    if (o.v > 0) { g.save(); g.translate(Math.round(o.x + o.w / 2), 0); g.scale(-1, 1); g.drawImage(im, 0, y); g.restore(); }
+    else g.drawImage(im, x, y);
+  });
+  const p = tip(), hk = G.hook;
+  g.fillStyle = "#eaf6ff";
+  for (let l = 0; l < hk.len; l += 1) g.fillRect(Math.round(OX + Math.sin(hk.ang) * l), Math.round(OY + Math.cos(hk.ang) * l), 1, 1);
+  g.fillStyle = "#cfd8e3"; g.fillRect(Math.round(p.x) - 3, Math.round(p.y), 7, 2); g.fillRect(Math.round(p.x) - 3, Math.round(p.y) + 2, 2, 3); g.fillRect(Math.round(p.x) + 2, Math.round(p.y) + 2, 2, 3);
+  G.fx.forEach(q => { g.fillStyle = q.c; g.fillRect(Math.round(q.x), Math.round(q.y), 3, 3); });
+  if (G.ink > 0) {
+    g.globalAlpha = G.ink < .6 ? G.ink / .6 : 1; g.fillStyle = "#000"; g.fillRect(0, SEA, W, H - SEA); g.globalAlpha = 1;
+    g.fillStyle = "#6f7f93"; g.font = "12px DotGothic16, sans-serif"; g.textAlign = "center";
+    g.fillText("章魚噴墨！海底一片漆黑（" + Math.ceil(G.ink) + "）", W / 2, SEA + 40);
+  }
+  g.fillStyle = "#8b5a2b"; g.fillRect(OX - 32, SEA - 10, 56, 6); g.fillRect(OX - 26, SEA - 4, 44, 4);
+  g.fillStyle = "#d9482b"; g.fillRect(OX - 32, SEA - 12, 56, 2);
+  g.fillStyle = "#f4e3b2"; g.fillRect(OX - 24, SEA - 26, 14, 14); g.fillStyle = "#7fd0ff"; g.fillRect(OX - 21, SEA - 23, 8, 6);
+  g.fillStyle = "#5a3b1a"; for (let i = 0; i <= 14; i++) g.fillRect(OX - 14 + i, Math.round(SEA - 12 - i * (10 / 14)), 2, 2);
+  g.font = "11px DotGothic16, sans-serif"; g.textAlign = "center";
+  G.txt.forEach(t => { g.globalAlpha = Math.min(1, t.life * 2); g.fillStyle = "#000"; g.fillText(t.s, t.x + 1, t.y + 1); g.fillStyle = t.c; g.fillText(t.s, t.x, t.y); });
+  g.globalAlpha = 1;
+  if (G.paused) { g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, 0, W, H); g.fillStyle = "#ffd23f"; g.font = "20px DotGothic16, sans-serif"; g.fillText("暫停中", W / 2, H / 2); }
+}
+function startGame() {
+  const mine = G = {
+    t: S.bank, objs: [], fx: [], txt: [], hook: { ang: 0, dir: 1, len: MINLEN, st: "swing", obj: null },
+    ink: 0, run: true, paused: false, last: performance.now(), spawnT: 0, trashT: 0, chestT: 0, tick: 0
+  };
+  S.score = 0; S.caught = {};
+  for (const k in T) for (let i = 0; i < (T[k].cnt || 0); i++) spawn(k);
+  for (let i = 0; i < 4; i++) spawn(i % 2 ? "t1" : "t2");
+  spawn("ch");
+  show("game");
+  $("#hScore").textContent = "0"; $("#hTime").textContent = fmt(G.t); $("#btnPause").textContent = "暫停";
+  cv.focus({ preventScroll: true });
+  (function loop(ts) {
+    if (G !== mine || !mine.run) return;
+    const dt = Math.min(.05, (ts - mine.last) / 1000 || 0); mine.last = ts;
+    if (!mine.paused) { mine.tick++; update(dt); }
+    if (G === mine && mine.run) { draw(); requestAnimationFrame(loop); }
+  })(performance.now());
+}
+function launch() { if (G && G.run && !G.paused && G.hook.st === "swing") G.hook.st = "out"; }
+function togglePause(force) {
+  if (!G || !G.run) return;
+  G.paused = typeof force === "boolean" ? force : !G.paused;
+  $("#btnPause").textContent = G.paused ? "繼續" : "暫停";
+}
+function endGame(noTime) {
+  if (G) G.run = false;
+  if (noTime) { S.score = 0; S.caught = {}; }
+  S.bank = 0; drawBank();
+  const best = ls.get("best", 0);
+  if (S.score > best) ls.set("best", S.score);
+  $("#endTitle").textContent = noTime ? "遊戲時間用完了" : "時間到！";
+  $("#endScore").textContent = S.score + " 分";
+  $("#endBest").textContent = noTime ? "測驗答錯太多，時間都扣光了。再讀幾遍課文，就能換回遊戲時間。"
+    : S.score > best ? "新紀錄！" : "這台裝置的最高分：" + best + " 分";
+  const entries = Object.entries(S.caught);
+  $("#tally").innerHTML = entries.length ? entries.map(e => `<li>${T[e[0]].n} ×${e[1]}</li>`).join("") : "<li>這次沒有釣到東西</li>";
+  show("end");
+}
+/* ---------- Wiring ---------- */
+function fillSel() {
+  const sel = $("#lessonSel"); sel.innerHTML = "";
+  LESSONS.forEach((l, i) => { const o = document.createElement("option"); o.value = i; o.textContent = l.title; sel.appendChild(o); });
+}
+function resetFlow() { loadLesson(Math.min(S.lesson, LESSONS.length - 1)); $("#lessonSel").value = S.lesson; show("read"); }
+
+$("#lessonSel").addEventListener("change", e => loadLesson(+e.target.value));
+$("#btnStart").addEventListener("click", startReading);
+$("#btnDone").addEventListener("click", finishReading);
+$("#btnTeacher").addEventListener("click", teacherConfirm);
+$("#btnToQuiz").addEventListener("click", startQuiz);
+$("#btnNext").addEventListener("click", nextQuestion);
+$("#btnPause").addEventListener("click", () => togglePause());
+$("#btnAgain").addEventListener("click", resetFlow);
+cv.addEventListener("pointerdown", e => { e.preventDefault(); launch(); });
+document.addEventListener("keydown", e => {
+  if ($("#s-game").hidden) return;
+  if (e.target !== cv && e.target !== document.body) return;
+  if (e.code === "Space" || e.code === "ArrowDown") { e.preventDefault(); launch(); }
+  else if (e.code === "KeyP") togglePause();
+});
+document.addEventListener("visibilitychange", () => { if (document.hidden) togglePause(true); });
+
+/* ---------- Teacher panel ---------- */
+const pinOk = v => v === PIN;
+$("#btnUnlock").addEventListener("click", () => {
+  if (!pinOk($("#pinT").value)) { setMsg($("#tMsg"), "密碼不對。", "bad"); return; }
+  $("#pinT").value = ""; setMsg($("#tMsg"), "");
+  $("#tLock").hidden = true; $("#tBody").hidden = false;
+  $("#lessonJson").value = JSON.stringify(LESSONS, null, 2);
+});
+$("#btnApply").addEventListener("click", () => {
+  let arr = null;
+  try { arr = JSON.parse($("#lessonJson").value); } catch (e) { setMsg($("#tMsg2"), "JSON 格式有誤，請檢查逗號與引號。", "bad"); return; }
+  if (!validLessons(arr)) { setMsg($("#tMsg2"), "每一課都需要 title、text，以及至少一題 quiz（q、o 兩個以上選項、a 為正確選項編號）。", "bad"); return; }
+  LESSONS = arr; ls.set("lessons", arr); S.lesson = 0; fillSel(); loadLesson(0);
+  setMsg($("#tMsg2"), `已套用，共 ${arr.length} 課。`, "good");
+});
+$("#btnReset").addEventListener("click", () => {
+  ls.del("lessons"); LESSONS = SAMPLE; S.lesson = 0; fillSel(); loadLesson(0);
+  $("#lessonJson").value = JSON.stringify(LESSONS, null, 2);
+  setMsg($("#tMsg2"), "已還原範例課文。", "good");
+});
+
+/* ---------- Browser speech fallback (works when the page is hosted as a normal site) ---------- */
+function browserSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  let rec = null, state = "idle", stopping = false, onP = () => {}, onF = () => {}, onS = () => {}, endWaiters = [];
+  const set = (s, reason) => { state = s; onS(reason ? { state: s, reason } : { state: s }); };
+  return {
+    start() {
+      return new Promise((resolve, reject) => {
+        if (state !== "idle") { resolve(); return; }
+        let opened = false; stopping = false;
+        rec = new SR(); rec.lang = "zh-TW"; rec.continuous = true; rec.interimResults = true;
+        rec.onstart = () => { opened = true; set("listening"); resolve(); };
+        rec.onresult = ev => {
+          let interim = "";
+          for (let i = ev.resultIndex; i < ev.results.length; i++) {
+            const r = ev.results[i];
+            if (r.isFinal) { onP({ text: "" }); onF({ text: r[0].transcript }); } else interim += r[0].transcript;
+          }
+          if (interim) onP({ text: interim });
+        };
+        rec.onerror = ev => {
+          const c = ev.error === "not-allowed" || ev.error === "service-not-allowed" ? "not_granted" : ev.error === "no-speech" || ev.error === "aborted" ? null : "upstream_error";
+          if (c && !opened) reject({ code: c, message: ev.error });
+          if (c) rec._err = c;
+        };
+        rec.onend = () => {
+          const reason = stopping ? "stopped" : rec._err || "viewer_stopped";
+          if (!opened) reject({ code: rec._err || "upstream_error", message: "no start" });
+          set("idle", reason);
+          endWaiters.forEach(f => f()); endWaiters = [];
+        };
+        try { rec.start(); } catch (e) { reject({ code: "upstream_error", message: String(e) }); }
+      });
+    },
+    stop() {
+      return new Promise(res => {
+        if (state === "idle") { res(); return; }
+        stopping = true; endWaiters.push(res);
+        try { rec.stop(); } catch (e) { res(); }
+      });
+    },
+    active: () => state !== "idle",
+    onPartial: f => { onP = f; return () => {}; },
+    onFinal: f => { onF = f; return () => {}; },
+    onState: f => { onS = f; return () => {}; }
+  };
+}
+
+/* ---------- Dictation (speech check) ---------- */
+(async function initDictation() {
+  try { dict = window.claude && window.claude.use ? await window.claude.use("dictation") : null; } catch (e) { dict = null; }
+  if (!dict) dict = browserSpeech();
+  if (!dict) {
+    $("#helper").open = true;
+    $("#btnStart").disabled = true; $("#btnDone").disabled = true;
+    setMsg($("#readMsg"), "這裡無法收音驗證，請家長在下方輸入密碼，協助確認每一遍。");
+    return;
+  }
+  dict.onPartial(e => { partial = e.text; drawLive(); });
+  dict.onFinal(e => { heard += e.text; partial = ""; drawLive(); });
+  dict.onState(e => {
+    listening = e.state !== "idle";
+    $("#btnStart").textContent = listening ? "● 聽著呢…" : "● 開始朗讀";
+    $("#btnStart").disabled = listening || S.rounds >= MAX_ROUNDS;
+    $("#btnDone").disabled = e.state !== "listening";
+    if (e.state === "idle" && e.reason === "viewer_stopped") judge();
+    else if (e.state === "idle" && (e.reason === "hidden" || e.reason === "upstream_error" || e.reason === "time_limit"))
+      setMsg($("#readMsg"), "收音中斷了，請再按「開始朗讀」。", "bad");
+    drawLive();
+  });
+})();
+
+fillSel(); loadLesson(0);
+</script>
+</body>
+</html>
