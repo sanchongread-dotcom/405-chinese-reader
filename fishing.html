@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>朗讀釣魚島</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&display=swap">
@@ -19,9 +18,10 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{
   background:var(--ink); color:var(--text); font-family:var(--f-b); font-size:16px; line-height:1.6;
-  padding-block:14px 40px;
+  padding-top:calc(14px + env(safe-area-inset-top,0px));padding-bottom:calc(40px + env(safe-area-inset-bottom,0px));
   padding-left:max(16px,env(safe-area-inset-left,0px));
   padding-right:max(16px,env(safe-area-inset-right,0px));
 }
@@ -79,12 +79,27 @@ details .row{margin-top:8px}
 .tally{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 14px;padding:0;list-style:none}
 .teacher textarea{width:100%;min-height:9em;font:13px/1.5 ui-monospace,Menlo,monospace;color:var(--text);background:#07162c;border:3px solid var(--foam);padding:8px;border-radius:0}
 .teacher p{margin:6px 0;color:var(--mute);font-size:.9rem}
+.sub{margin:0 0 12px;color:var(--mute)}
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.mode{font-family:var(--f-d);text-align:left;color:var(--text);background:#0a2142;border:4px solid var(--foam);padding:12px 14px;cursor:pointer;border-radius:0;display:flex;flex-direction:column;gap:4px;box-shadow:0 4px 0 #000a}
+.mode b{font-size:1.25rem;color:var(--sun)}
+.mode span{font-size:.95rem;color:var(--mute);font-family:var(--f-b)}
+.mode:hover{background:#143a6b}
+.phrase{font-family:var(--f-d);font-size:2rem;letter-spacing:.2em;text-align:center;margin:10px 0 2px;overflow-wrap:anywhere}
+.phrase u{color:var(--sun);text-decoration:none;border-bottom:4px solid var(--sun);padding:0 .15em}
+.zy{text-align:center;color:var(--foam);margin-bottom:10px;font-size:1.05rem;letter-spacing:.1em}
+.opts.grid{grid-template-columns:repeat(2,1fr)}
+.opts.grid .opt{font-size:1.9rem;text-align:center;padding:12px 6px}
+.hwwrap{display:flex;justify-content:center}
+#hw{width:min(100%,320px);aspect-ratio:1;max-width:100%;background:#f4f8ff;border:4px solid #000;touch-action:none;
+  background-image:linear-gradient(#c3d4ec 1px,transparent 1px),linear-gradient(90deg,#c3d4ec 1px,transparent 1px);background-size:50% 50%;user-select:none}
+#hw svg{display:block;touch-action:none}
 @media (prefers-reduced-motion:reduce){.btn:active:not([disabled]){transform:none}}
 @media (max-width:480px){h1{font-size:1.5rem}.passage{font-size:1.15rem}}
 </style>
+
 </head>
 <body>
-
 <main class="wrap">
   <header class="top">
     <h1>朗讀釣魚島</h1>
@@ -113,6 +128,54 @@ details .row{margin-top:8px}
       </div>
     </details>
     <div class="row end"><button class="btn" id="btnToQuiz" disabled>開始閱讀測驗 ▶</button></div>
+  </section>
+
+  <section id="s-zi" class="panel" hidden>
+    <div class="row"><label for="lessonSel2">課文</label><select id="lessonSel2"></select></div>
+    <h2 id="ziTitle">國字練習</h2>
+    <div id="ziMenu">
+      <p class="sub">這一課的朗讀已經完成過了，今天換一種方式賺遊戲時間。</p>
+      <div class="modes">
+        <button class="mode" id="modePick"><b>找出正確國字</b><span>共 10 題，每答對 1 題 +6 秒</span></button>
+        <button class="mode" id="modeWrite"><b>限時手寫挑戰</b><span>直接在螢幕上寫字，寫對越多，時間越長</span></button>
+      </div>
+    </div>
+    <div id="pickBox" hidden>
+      <div class="qhead"><span id="pkNo"></span><span id="pkGot"></span></div>
+      <div class="phrase" id="pkPhrase"></div>
+      <div class="zy" id="pkZy"></div>
+      <div class="opts grid" id="pkOpts"></div>
+      <p class="msg" id="pkMsg" aria-live="polite"></p>
+      <div class="row end"><button class="btn" id="pkNext" hidden>下一題 ▶</button></div>
+    </div>
+    <div id="writeBox" hidden>
+      <div id="wLevels">
+        <p class="sub">選一個關卡。每個字要寫對（錯筆不超過 2 次）才算數，達標才拿到全部獎勵。</p>
+        <div class="modes">
+          <button class="mode" data-lv="0"><b>初級</b><span>1 分鐘內寫對 3 個字<br>獎勵 +30 秒</span></button>
+          <button class="mode" data-lv="1"><b>中級</b><span>2 分鐘內寫對 5 個字<br>獎勵 +2 分鐘</span></button>
+          <button class="mode" data-lv="2"><b>高級</b><span>5 分鐘內寫對 10 個字<br>獎勵 +5 分鐘</span></button>
+        </div>
+        <p class="hint">沒達標，但寫對一半以上，可以拿到一半獎勵。</p>
+      </div>
+      <div id="wPlay" hidden>
+        <div class="hud"><div>剩餘<b id="wTime">0:00</b></div><div>寫對<b id="wOk">0</b></div><button class="btn alt sm" id="wQuit">放棄</button></div>
+        <div class="phrase" id="wPhrase"></div>
+        <div class="zy" id="wZy"></div>
+        <div class="hwwrap"><div id="hw" aria-label="手寫區，請用手指或滑鼠依筆順一筆一筆寫"></div></div>
+        <p class="msg" id="wMsg" aria-live="polite"></p>
+      </div>
+      <div id="wDone" hidden>
+        <div class="big" id="wResult"></div>
+        <p class="msg" id="wDoneMsg"></p>
+        <div class="row"><button class="btn alt" id="wAgain">再挑戰一次</button></div>
+      </div>
+    </div>
+    <p class="msg" id="ziNote" aria-live="polite"></p>
+    <div class="row end">
+      <button class="btn alt" id="ziBack" hidden>換一種題型</button>
+      <button class="btn" id="btnToQuiz2" disabled>開始閱讀測驗（5 題）▶</button>
+    </div>
   </section>
 
   <section id="s-quiz" class="panel" hidden>
@@ -424,6 +487,218 @@ const SAMPLE = [
     ],
     "a": 1
    }
+  ],
+  "words": [
+   {
+    "c": "頸",
+    "zy": "ㄐㄧㄥˇ",
+    "n": 16,
+    "items": [
+     "長□鹿",
+     "長□鹿的脖子又細又長。"
+    ],
+    "wrong": [
+     "勁",
+     "經",
+     "徑"
+    ]
+   },
+   {
+    "c": "臨",
+    "zy": "ㄌㄧㄣˊ",
+    "n": 17,
+    "items": [
+     "居高□下",
+     "站在高樓上居高□下，風景真美。"
+    ],
+    "wrong": [
+     "林",
+     "鄰",
+     "監"
+    ]
+   },
+   {
+    "c": "代",
+    "zy": "ㄉㄞˋ",
+    "n": 5,
+    "items": [
+     "□表",
+     "竹節外形□表經濟節節高升。"
+    ],
+    "wrong": [
+     "伐",
+     "袋",
+     "戴"
+    ]
+   },
+   {
+    "c": "樓",
+    "zy": "ㄌㄡˊ",
+    "n": 15,
+    "items": [
+     "大□",
+     "這棟大□像長頸鹿一樣高。"
+    ],
+    "wrong": [
+     "摟",
+     "漏",
+     "簍"
+    ]
+   },
+   {
+    "c": "震",
+    "zy": "ㄓㄣˋ",
+    "n": 15,
+    "items": [
+     "地□",
+     "阻尼器能減少地□造成的搖晃。"
+    ],
+    "wrong": [
+     "振",
+     "霞",
+     "霧"
+    ]
+   },
+   {
+    "c": "尼",
+    "zy": "ㄋㄧˊ",
+    "n": 5,
+    "items": [
+     "阻□器",
+     "阻□器可以避免大樓搖晃。"
+    ],
+    "wrong": [
+     "泥",
+     "呢",
+     "妮"
+    ]
+   },
+   {
+    "c": "濟",
+    "zy": "ㄐㄧˋ",
+    "n": 17,
+    "items": [
+     "經□",
+     "古錢圖案代表經□節節高升。"
+    ],
+    "wrong": [
+     "齊",
+     "劑",
+     "擠"
+    ]
+   },
+   {
+    "c": "京",
+    "zy": "ㄐㄧㄥ",
+    "n": 8,
+    "items": [
+     "東□",
+     "東□晴空塔在二○一二年完工。"
+    ],
+    "wrong": [
+     "景",
+     "涼",
+     "鯨"
+    ]
+   },
+   {
+    "c": "器",
+    "zy": "ㄑㄧˋ",
+    "n": 16,
+    "items": [
+     "阻尼□",
+     "大樓裡面安裝了一座阻尼□。"
+    ],
+    "wrong": [
+     "氣",
+     "汽",
+     "棄"
+    ]
+   },
+   {
+    "c": "阻",
+    "zy": "ㄗㄨˇ",
+    "n": 8,
+    "items": [
+     "□尼器",
+     "□尼器安裝在大樓裡面。"
+    ],
+    "wrong": [
+     "組",
+     "祖",
+     "助"
+    ]
+   },
+   {
+    "c": "橋",
+    "zy": "ㄑㄧㄠˊ",
+    "n": 16,
+    "items": [
+     "連通□",
+     "兩座大樓之間有一座連通□。"
+    ],
+    "wrong": [
+     "僑",
+     "嬌",
+     "驕"
+    ]
+   },
+   {
+    "c": "訊",
+    "zy": "ㄒㄩㄣˋ",
+    "n": 10,
+    "items": [
+     "收□",
+     "晴空塔改善城市收□不良。"
+    ],
+    "wrong": [
+     "迅",
+     "汛",
+     "訓"
+    ]
+   },
+   {
+    "c": "晴",
+    "zy": "ㄑㄧㄥˊ",
+    "n": 12,
+    "items": [
+     "□空塔",
+     "東京□空塔融入藍天。"
+    ],
+    "wrong": [
+     "睛",
+     "情",
+     "清"
+    ]
+   },
+   {
+    "c": "吉",
+    "zy": "ㄐㄧˊ",
+    "n": 6,
+    "items": [
+     "□隆坡",
+     "雙峰塔在□隆坡。"
+    ],
+    "wrong": [
+     "古",
+     "告",
+     "舌"
+    ]
+   },
+   {
+    "c": "塔",
+    "zy": "ㄊㄚˇ",
+    "n": 13,
+    "items": [
+     "晴空□",
+     "晴空□是一座電波通訊塔。"
+    ],
+    "wrong": [
+     "搭",
+     "答",
+     "踏"
+    ]
+   }
   ]
  },
  {
@@ -488,19 +763,27 @@ function validLessons(arr) {
     l && typeof l.title === "string" && l.title && typeof l.text === "string" && l.text.length > 5 &&
     Array.isArray(l.quiz) && l.quiz.length > 0 && l.quiz.every(q =>
       q && typeof q.q === "string" && Array.isArray(q.o) && q.o.length >= 2 && q.o.every(x => typeof x === "string") &&
-      Number.isInteger(q.a) && q.a >= 0 && q.a < q.o.length));
+      Number.isInteger(q.a) && q.a >= 0 && q.a < q.o.length) &&
+    (l.words === undefined || (Array.isArray(l.words) && l.words.every(w =>
+      w && typeof w.c === "string" && w.c.length === 1 && typeof w.zy === "string" && Number.isInteger(w.n) && w.n > 0 &&
+      Array.isArray(w.items) && w.items.length > 0 && w.items.every(s => typeof s === "string" && s.split("□").length === 2) &&
+      Array.isArray(w.wrong) && w.wrong.length >= 2 && w.wrong.every(x => typeof x === "string" && x.length === 1 && x !== w.c)))));
 }
 let LESSONS = (() => { const s = ls.get("lessons", null); return validLessons(s) ? s : SAMPLE; })();
 
 const MAX_ROUNDS = 5, SEC_PER_ROUND = 60, PENALTY = 20, PASS = 0.6;
-const S = { lesson: 0, rounds: 0, bank: 0, qi: 0, order: [], score: 0, caught: {}, ready: false };
+const MAX_BANK = 600, QUIZ_FIRST = 15, QUIZ_LATER = 5, PICK_N = 10, PICK_SEC = 6;
+const S = { lesson: 0, mode: "read", rounds: 0, bank: 0, qi: 0, order: [], score: 0, caught: {}, ready: false };
+const addBank = sec => { const b = S.bank; S.bank = Math.min(MAX_BANK, S.bank + sec); drawBank(); return S.bank - b; };
+const hasWords = L => Array.isArray(L.words) && L.words.length >= 4;
 const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const setMsg = (el, t, cls) => { el.textContent = t || ""; el.className = "msg" + (cls ? " " + cls : ""); };
 
 function show(id) {
-  ["read", "quiz", "game", "end"].forEach(k => { $("#s-" + k).hidden = k !== id; });
-  const order = ["read", "quiz", "game"], at = order.indexOf(id === "end" ? "game" : id);
+  ["read", "zi", "quiz", "game", "end"].forEach(k => { $("#s-" + k).hidden = k !== id; });
+  $("#steps li").textContent = S.mode === "zi" ? "1 國字" : "1 朗讀";
+  const order = ["read", "quiz", "game"], at = order.indexOf(id === "zi" ? "read" : id === "end" ? "game" : id);
   document.querySelectorAll("#steps li").forEach(li => {
     const i = order.indexOf(li.dataset.s);
     li.className = id === "end" ? "done" : i === at ? "on" : i < at ? "done" : "";
@@ -538,6 +821,12 @@ function drawLive() {
   el.className = "live" + (listening ? " hot" : "");
   el.textContent = t || (listening ? "聽著呢，請開始唸…" : S.rounds >= MAX_ROUNDS ? "已經讀滿 5 遍，換到最多 5 分鐘囉！" : "按「開始朗讀」，把整篇課文大聲唸出來。");
 }
+function enterLesson(i) {
+  loadLesson(i);
+  S.mode = hasWords(LESSONS[i]) && ls.get("seen:" + LESSONS[i].title, false) ? "zi" : "read";
+  $("#lessonSel").value = i; $("#lessonSel2").value = i;
+  if (S.mode === "zi") { ziReset(); show("zi"); } else show("read");
+}
 function loadLesson(i) {
   S.lesson = i; S.rounds = 0; S.bank = 0; heard = ""; partial = "";
   const L = LESSONS[i];
@@ -547,7 +836,8 @@ function loadLesson(i) {
   drawRounds(); drawLive();
 }
 function passRound(how) {
-  S.rounds++; S.bank += SEC_PER_ROUND;
+  S.rounds++; addBank(SEC_PER_ROUND);
+  ls.set("seen:" + LESSONS[S.lesson].title, true);
   setMsg($("#readMsg"), `第 ${S.rounds} 遍通過${how || ""}！遊戲時間 +1 分鐘${S.rounds >= MAX_ROUNDS ? "，已達上限" : ""}。`, "good");
   heard = ""; partial = ""; drawRounds(); drawLive();
 }
@@ -586,8 +876,21 @@ function teacherConfirm() {
 }
 
 /* ---------- Quiz ---------- */
+function pickQuiz() {
+  const L = LESSONS[S.lesson], all = L.quiz.map((_, i) => i), key = "used:" + L.title;
+  const want = Math.min(S.mode === "zi" ? QUIZ_LATER : QUIZ_FIRST, all.length);
+  let used = ls.get(key, []).filter(i => i < all.length);
+  let pick = shuffle(all.filter(i => !used.includes(i))).slice(0, want);
+  if (pick.length < want) {
+    // not enough unused questions: start a new cycle
+    pick = pick.concat(shuffle(all.filter(i => !pick.includes(i))).slice(0, want - pick.length));
+    used = pick.slice();
+  } else used = used.concat(pick);
+  ls.set(key, used);
+  return shuffle(pick);
+}
 function startQuiz() {
-  S.qi = 0; S.order = shuffle(LESSONS[S.lesson].quiz.map((_, i) => i));
+  S.qi = 0; S.order = pickQuiz();
   show("quiz"); drawQuestion();
 }
 function drawQuestion() {
@@ -623,6 +926,7 @@ function nextQuestion() {
   if (S.bank <= 0) { endGame(true); return; }
   startGame();
 }
+
 /* ---------- Pixel sprites ---------- */
 function mk(map, pal, c) {
   const h = map.length, w = Math.max(...map.map(r => r.length));
@@ -841,14 +1145,310 @@ function endGame(noTime) {
   $("#tally").innerHTML = entries.length ? entries.map(e => `<li>${T[e[0]].n} ×${e[1]}</li>`).join("") : "<li>這次沒有釣到東西</li>";
   show("end");
 }
+
+/* ---------- Character practice (second visit onward) ---------- */
+const LEVELS = [
+  { n: 3, sec: 60, maxStroke: 8, reward: 30, name: "初級" },
+  { n: 5, sec: 120, maxStroke: 13, reward: 120, name: "中級" },
+  { n: 10, sec: 300, maxStroke: 99, reward: 300, name: "高級" }
+];
+const MAX_MISS = 2;
+const words = () => LESSONS[S.lesson].words || [];
+const blankHtml = (s, ch) => {
+  const [a, b] = s.split("□");
+  const esc = t => t.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  return esc(a) + "<u>" + (ch ? esc(ch) : "&nbsp;&nbsp;") + "</u>" + esc(b);
+};
+function ziSetVisible(which) {
+  $("#ziMenu").hidden = which !== "menu";
+  $("#pickBox").hidden = which !== "pick";
+  $("#writeBox").hidden = which !== "write";
+  $("#ziBack").hidden = which === "menu";
+}
+function ziRefresh() {
+  $("#btnToQuiz2").disabled = S.bank <= 0;
+  $("#btnToQuiz2").textContent = `開始閱讀測驗（${Math.min(QUIZ_LATER, LESSONS[S.lesson].quiz.length)} 題）▶`;
+  drawBank();
+}
+function ziReset() {
+  stopChallenge(true);
+  $("#ziTitle").textContent = "〈" + LESSONS[S.lesson].title + "〉國字練習";
+  setMsg($("#ziNote"), "");
+  ziSetVisible("menu"); ziRefresh();
+}
+
+/* --- Pick the right character --- */
+let PK = null;
+function startPick() {
+  const picks = shuffle(words()).slice(0, PICK_N);
+  PK = { list: picks.map(w => ({ w, s: w.items[Math.floor(Math.random() * w.items.length)] })), i: 0, ok: 0 };
+  setMsg($("#ziNote"), "");
+  ziSetVisible("pick"); drawPick();
+}
+function drawPick() {
+  const q = PK.list[PK.i];
+  $("#pkNo").textContent = `第 ${PK.i + 1} 題 / 共 ${PK.list.length} 題`;
+  $("#pkGot").textContent = `答對 ${PK.ok} 題`;
+  $("#pkPhrase").innerHTML = blankHtml(q.s, "");
+  $("#pkZy").textContent = "注音：" + q.w.zy;
+  setMsg($("#pkMsg"), "選出放進空格裡正確的字。");
+  $("#pkNext").hidden = true;
+  const box = $("#pkOpts"); box.innerHTML = "";
+  shuffle([q.w.c].concat(q.w.wrong.slice(0, 3))).forEach(c => {
+    const b = document.createElement("button");
+    b.className = "opt"; b.textContent = c; b.dataset.ok = c === q.w.c ? "1" : "";
+    b.addEventListener("click", () => pickAnswer(b, c === q.w.c));
+    box.appendChild(b);
+  });
+}
+function pickAnswer(btn, ok) {
+  const q = PK.list[PK.i];
+  document.querySelectorAll("#pkOpts .opt").forEach(b => { b.disabled = true; if (b.dataset.ok) b.classList.add("good"); });
+  if (ok) PK.ok++; else btn.classList.add("bad");
+  $("#pkPhrase").innerHTML = blankHtml(q.s, q.w.c);
+  setMsg($("#pkMsg"), ok ? "答對了！" : `正確的字是「${q.w.c}」。`, ok ? "good" : "bad");
+  $("#pkGot").textContent = `答對 ${PK.ok} 題`;
+  const last = PK.i >= PK.list.length - 1;
+  $("#pkNext").textContent = last ? "看結果 ▶" : "下一題 ▶";
+  $("#pkNext").hidden = false; $("#pkNext").focus();
+}
+function pickNext() {
+  if (PK.i < PK.list.length - 1) { PK.i++; drawPick(); return; }
+  const got = addBank(PK.ok * PICK_SEC);
+  ziSetVisible("menu");
+  setMsg($("#ziNote"), `找出正確國字：答對 ${PK.ok} / ${PK.list.length} 題，遊戲時間 +${got} 秒。想賺更多，可以再玩一次。`, got ? "good" : "");
+  PK = null; ziRefresh();
+}
+
+/* --- Timed handwriting challenge (stroke-order checking by Hanzi Writer) --- */
+let HW_PROMISE = null, C = null;
+function loadHanzi() {
+  if (window.HanziWriter) return Promise.resolve(true);
+  if (HW_PROMISE) return HW_PROMISE;
+  const urls = [
+    "https://cdn.jsdelivr.net/npm/hanzi-writer@3.5.0/dist/hanzi-writer.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/hanzi-writer/3.5.0/hanzi-writer.min.js",
+    "https://unpkg.com/hanzi-writer@3.5.0/dist/hanzi-writer.min.js"
+  ];
+  HW_PROMISE = (async () => {
+    for (const u of urls) {
+      const ok = await new Promise(res => {
+        const s = document.createElement("script");
+        s.src = u; s.onload = () => res(!!window.HanziWriter); s.onerror = () => res(false);
+        document.head.appendChild(s);
+      });
+      if (ok) return true;
+    }
+    return false;
+  })();
+  HW_PROMISE.then(ok => { if (!ok) HW_PROMISE = null; });
+  return HW_PROMISE;
+}
+function showLevels() {
+  $("#wLevels").hidden = false; $("#wPlay").hidden = true; $("#wDone").hidden = true;
+}
+async function startChallenge(lv) {
+  const L = LEVELS[lv];
+  const pool = shuffle(words().filter(w => w.n <= L.maxStroke));
+  if (pool.length < L.n) { setMsg($("#ziNote"), "這一課可寫的字不夠，這個關卡暫時不能玩。", "bad"); return; }
+  setMsg($("#ziNote"), "載入筆順資料中…");
+  const probe = pool.find(w => !CUSTOM[w.c]);
+  if (probe) {
+    const ok = await loadHanzi();
+    if (!ok) { setMsg($("#ziNote"), "載不到手寫元件。請確認網路，或換一種題型。", "bad"); return; }
+    try { await window.HanziWriter.loadCharacterData(probe.c); }
+    catch (e) { setMsg($("#ziNote"), "這個畫面載不到筆順資料，手寫挑戰要在老師提供的網站版本使用。可以先玩「找出正確國字」。", "bad"); return; }
+  }
+  setMsg($("#ziNote"), "");
+  C = { lv, L, pool, idx: 0, ok: 0, t: L.sec, end: performance.now() + L.sec * 1000, timer: null, writer: null, busy: false };
+  $("#wLevels").hidden = true; $("#wDone").hidden = true; $("#wPlay").hidden = false;
+  $("#wOk").textContent = "0 / " + L.n; $("#wTime").textContent = fmt(L.sec);
+  C.timer = setInterval(tickChallenge, 200);
+  showChar();
+}
+function tickChallenge() {
+  if (!C) return;
+  const left = Math.max(0, (C.end - performance.now()) / 1000);
+  $("#wTime").textContent = fmt(Math.ceil(left));
+  if (left <= 0) finishChallenge(false);
+}
+function showChar() {
+  if (!C) return;
+  const w = C.pool[C.idx], item = w.items[Math.floor(Math.random() * w.items.length)];
+  $("#wPhrase").innerHTML = blankHtml(item, "");
+  $("#wZy").textContent = "請寫出空格裡的字　注音：" + w.zy;
+  const hw = $("#hw"); hw.innerHTML = "";
+  const size = Math.max(200, Math.min(312, hw.clientWidth - 8 || 312));
+  C.busy = false;
+  try {
+    const writer = CUSTOM[w.c] ? customWriter(hw, w.c, size) : window.HanziWriter.create(hw, w.c, {
+      width: size, height: size, padding: 12,
+      showCharacter: false, showOutline: false, showHintAfterMisses: 3,
+      highlightOnComplete: true, leniency: 1.0, drawingWidth: 18, strokeColor: "#12243a",
+      onLoadCharDataError: () => skipChar("這個字的筆順載不到，換下一個。")
+    });
+    C.writer = writer;
+    writer.quiz({
+      onMistake: () => setMsg($("#wMsg"), "這一筆不太對，再試一次。", "bad"),
+      onCorrectStroke: () => setMsg($("#wMsg"), ""),
+      onComplete: s => charDone(w, item, s && s.totalMistakes || 0)
+    });
+  } catch (e) { skipChar("手寫元件出了問題，換下一個字。"); }
+}
+function charDone(w, item, miss) {
+  if (!C || C.busy) return; C.busy = true;
+  const good = miss <= MAX_MISS;
+  if (good) C.ok++;
+  $("#wOk").textContent = C.ok + " / " + C.L.n;
+  $("#wPhrase").innerHTML = blankHtml(item, w.c);
+  setMsg($("#wMsg"), good ? "寫對了！" : `寫完了，但錯了 ${miss} 筆，這個字不算。`, good ? "good" : "bad");
+  C.idx++;
+  advanceSoon();
+}
+function skipChar(msg) {
+  if (!C || C.busy) return; C.busy = true;
+  setMsg($("#wMsg"), msg, "bad"); C.idx++; advanceSoon();
+}
+function advanceSoon() {
+  const c = C;
+  setTimeout(() => {
+    if (C !== c || !C) return;
+    if (C.ok >= C.L.n) finishChallenge(true);
+    else if (C.idx >= C.pool.length) finishChallenge(false);
+    else { setMsg($("#wMsg"), ""); showChar(); }
+  }, 900);
+}
+function stopChallenge(silent) {
+  if (!C) return;
+  clearInterval(C.timer);
+  try { C.writer && C.writer.cancelQuiz(); } catch (e) {}
+  C = null;
+  if (silent) showLevels();
+}
+function finishChallenge(reachedGoal) {
+  if (!C) return;
+  const L = C.L, ok = C.ok;
+  clearInterval(C.timer);
+  try { C.writer && C.writer.cancelQuiz(); } catch (e) {}
+  C = null;
+  const reward = reachedGoal || ok >= L.n ? L.reward : ok * 2 >= L.n ? Math.round(L.reward / 2) : 0;
+  const got = addBank(reward);
+  const capped = got < reward ? "（遊戲時間最多 10 分鐘，已經存滿了）" : "";
+  $("#wPlay").hidden = true; $("#wDone").hidden = false;
+  $("#wResult").textContent = `寫對 ${ok} / ${L.n} 個`;
+  setMsg($("#wDoneMsg"), (
+    reward === L.reward ? `${L.name}挑戰成功！遊戲時間 +${got} 秒。` :
+    reward > 0 ? `差一點！寫對一半以上，遊戲時間 +${got} 秒。` : "這次沒有達標，沒有獎勵。再試一次，或換一種題型。") + capped,
+    reward ? "good" : "bad");
+  ziRefresh();
+}
+
+/* --- Own stroke checker for characters whose textbook order differs from the library --- */
+// Points are in a 0-100 box (x right, y down), read from the textbook stroke-order figures, one polyline per stroke, in textbook order.
+const CUSTOM = {
+  "訊": [[[26,22],[34,30]], [[11,37],[43,31]], [[14,46],[37,43]], [[15,55],[39,53]], [[23.5,64],[24.5,81]],
+         [[24.5,64],[38,64],[37,78]], [[25,79],[38,78]], [[55,33],[55,82]],
+         [[51,30],[76,27],[78,39],[81,64],[89,78],[92,71]], [[47,50],[65,49]]],
+  "塔": [[[7,46],[33,43.5]], [[21.5,23],[21.5,63]], [[11.5,72],[37,59]], [[41,18],[46,38]], [[35,32.5],[51,30]],
+         [[60,30],[80,26.5]], [[68,14.5],[62.5,39]], [[55,40],[46,55],[31,70]], [[56,41],[69,58],[91,65]],
+         [[48,62],[64,60]], [[44.5,75],[45.5,90]], [[46,72],[67.5,71],[66,84]], [[47.5,86],[67.5,85.5]]],
+  "尼": [[[33,23],[63.5,20],[62,37]], [[36,38],[60,36]], [[33,25],[30,47],[22,64],[14,77]], [[46,58],[68,56]],
+         [[42,44],[42,69],[46,81],[64,84],[80,83],[84,70]]]
+};
+const gdist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function glen(pts) { let s = 0; for (let i = 1; i < pts.length; i++) s += gdist(pts[i - 1], pts[i]); return s; }
+function resample(pts, n) {
+  const total = glen(pts), out = [pts[0]];
+  if (total === 0) { while (out.length < n) out.push(pts[0]); return out; }
+  const step = total / (n - 1); let acc = 0, need = step;
+  for (let i = 1; i < pts.length && out.length < n; i++) {
+    let a = pts[i - 1], seg = gdist(a, pts[i]);
+    while (seg > 0 && acc + seg >= need && out.length < n) {
+      const t = (need - acc) / seg, p = [a[0] + (pts[i][0] - a[0]) * t, a[1] + (pts[i][1] - a[1]) * t];
+      out.push(p); a = p; seg = gdist(a, pts[i]); acc = 0; need = step;
+    }
+    acc += seg;
+  }
+  while (out.length < n) out.push(pts[pts.length - 1]);
+  return out;
+}
+function strokeScore(user, tm) {
+  const n = 20, u = resample(user, n), t = resample(tm, n);
+  let sum = 0; for (let i = 0; i < n; i++) sum += gdist(u[i], t[i]);
+  const avg = sum / n, s = gdist(u[0], t[0]), e = gdist(u[n - 1], t[n - 1]);
+  let dirOk = true;
+  if (glen(tm) >= 10) {
+    const a = [u[n - 1][0] - u[0][0], u[n - 1][1] - u[0][1]], b = [t[n - 1][0] - t[0][0], t[n - 1][1] - t[0][1]];
+    const la = Math.hypot(a[0], a[1]), lb = Math.hypot(b[0], b[1]);
+    dirOk = la > 0 && lb > 0 && (a[0] * b[0] + a[1] * b[1]) / (la * lb) >= 0.3;
+  }
+  return { avg, ok: dirOk && avg <= 15 && s <= 24 && e <= 28 };
+}
+function customWriter(el, ch, size) {
+  const NS = "http://www.w3.org/2000/svg", T = CUSTOM[ch];
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", size); svg.setAttribute("height", size); svg.setAttribute("viewBox", "0 0 100 100");
+  svg.style.cssText = "display:block;touch-action:none";
+  el.appendChild(svg);
+  let idx = 0, miss = 0, total = 0, h = {}, cur = null, line = null, hint = null, on = false;
+  const mk = (pts, color, w) => {
+    const p = document.createElementNS(NS, "polyline");
+    p.setAttribute("points", pts.map(q => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" "));
+    p.setAttribute("fill", "none"); p.setAttribute("stroke", color); p.setAttribute("stroke-width", w);
+    p.setAttribute("stroke-linecap", "round"); p.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(p); return p;
+  };
+  const toU = e => { const r = svg.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 100, (e.clientY - r.top) / r.height * 100]; };
+  const down = e => {
+    if (!on || idx >= T.length) return;
+    e.preventDefault(); try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+    cur = [toU(e)]; line = mk(cur, "#12243a", 3.2);
+  };
+  const move = e => { if (cur) { cur.push(toU(e)); line.setAttribute("points", cur.map(q => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" ")); } };
+  const up = () => {
+    if (!cur) return;
+    const pts = cur; cur = null; const drawn = line; line = null;
+    if (glen(pts) < 3) { drawn.remove(); return; }
+    const mine = strokeScore(pts, T[idx]);
+    let better = false;   // the stroke looks more like a later stroke: wrong order
+    for (let j = idx + 1; j < T.length; j++) { const o = strokeScore(pts, T[j]); if (o.ok && o.avg < mine.avg - 3) better = true; }
+    if (mine.ok && !better) {
+      if (hint) { hint.remove(); hint = null; }
+      idx++; miss = 0;
+      h.onCorrectStroke && h.onCorrectStroke({ strokeNum: idx - 1 });
+      if (idx >= T.length) { on = false; h.onComplete && h.onComplete({ character: ch, totalMistakes: total }); }
+    } else {
+      drawn.remove(); total++; miss++;
+      h.onMistake && h.onMistake({ strokeNum: idx });
+      if (miss >= 3 && !hint) { hint = mk(T[idx], "#ff9f43", 2.4); }
+    }
+  };
+  ["pointerdown", "pointermove", "pointerup", "pointercancel"].forEach((n, i) => svg.addEventListener(n, [down, move, up, up][i]));
+  return {
+    quiz(handlers) { h = handlers || {}; on = true; },
+    cancelQuiz() { on = false; cur = null; }
+  };
+}
+
 /* ---------- Wiring ---------- */
 function fillSel() {
-  const sel = $("#lessonSel"); sel.innerHTML = "";
-  LESSONS.forEach((l, i) => { const o = document.createElement("option"); o.value = i; o.textContent = l.title; sel.appendChild(o); });
+  ["#lessonSel", "#lessonSel2"].forEach(id => {
+    const sel = $(id); sel.innerHTML = "";
+    LESSONS.forEach((l, i) => { const o = document.createElement("option"); o.value = i; o.textContent = l.title; sel.appendChild(o); });
+  });
 }
-function resetFlow() { loadLesson(Math.min(S.lesson, LESSONS.length - 1)); $("#lessonSel").value = S.lesson; show("read"); }
+function resetFlow() { enterLesson(Math.min(S.lesson, LESSONS.length - 1)); }
 
-$("#lessonSel").addEventListener("change", e => loadLesson(+e.target.value));
+$("#lessonSel").addEventListener("change", e => enterLesson(+e.target.value));
+$("#lessonSel2").addEventListener("change", e => enterLesson(+e.target.value));
+$("#modePick").addEventListener("click", startPick);
+$("#modeWrite").addEventListener("click", () => { setMsg($("#ziNote"), ""); ziSetVisible("write"); showLevels(); });
+document.querySelectorAll("#wLevels .mode").forEach(b => b.addEventListener("click", () => startChallenge(+b.dataset.lv)));
+$("#wQuit").addEventListener("click", () => { stopChallenge(true); });
+$("#wAgain").addEventListener("click", showLevels);
+$("#ziBack").addEventListener("click", () => { stopChallenge(false); PK = null; setMsg($("#ziNote"), ""); ziSetVisible("menu"); ziRefresh(); });
+$("#pkNext").addEventListener("click", pickNext);
+$("#btnToQuiz2").addEventListener("click", () => { stopChallenge(false); startQuiz(); });
 $("#btnStart").addEventListener("click", startReading);
 $("#btnDone").addEventListener("click", finishReading);
 $("#btnTeacher").addEventListener("click", teacherConfirm);
@@ -877,11 +1477,11 @@ $("#btnApply").addEventListener("click", () => {
   let arr = null;
   try { arr = JSON.parse($("#lessonJson").value); } catch (e) { setMsg($("#tMsg2"), "JSON 格式有誤，請檢查逗號與引號。", "bad"); return; }
   if (!validLessons(arr)) { setMsg($("#tMsg2"), "每一課都需要 title、text，以及至少一題 quiz（q、o 兩個以上選項、a 為正確選項編號）。", "bad"); return; }
-  LESSONS = arr; ls.set("lessons", arr); S.lesson = 0; fillSel(); loadLesson(0);
+  LESSONS = arr; ls.set("lessons", arr); S.lesson = 0; fillSel(); enterLesson(0);
   setMsg($("#tMsg2"), `已套用，共 ${arr.length} 課。`, "good");
 });
 $("#btnReset").addEventListener("click", () => {
-  ls.del("lessons"); LESSONS = SAMPLE; S.lesson = 0; fillSel(); loadLesson(0);
+  ls.del("lessons"); LESSONS = SAMPLE; S.lesson = 0; fillSel(); enterLesson(0);
   $("#lessonJson").value = JSON.stringify(LESSONS, null, 2);
   setMsg($("#tMsg2"), "已還原範例課文。", "good");
 });
@@ -959,7 +1559,8 @@ function browserSpeech() {
   });
 })();
 
-fillSel(); loadLesson(0);
+fillSel(); enterLesson(0);
+
 </script>
 </body>
 </html>
