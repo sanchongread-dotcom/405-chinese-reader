@@ -142,10 +142,16 @@ details{background:#f5f6fb;border:1px solid #dce1ef;border-radius:12px;padding:1
 #s-game{position:relative;overflow:hidden;background:linear-gradient(165deg,#172b56,#322d69 80%);border-color:#7273b9}
 #s-game::before{content:"PIXEL OCEAN · 海底探險";display:block;font:700 12px/1.5 ui-monospace,monospace;letter-spacing:.18em;color:#d6d5ff;margin-bottom:12px}
 #s-game .hud{background:#101d43;border:1px solid #5967a1;border-radius:12px;padding:12px 14px;justify-content:space-between}
-#s-game #cv{border:6px solid #111d3c;border-radius:12px;box-shadow:0 0 0 2px #7785bd,0 14px 30px #0a123c88}
+#s-game #cv{border:2px solid #8495be;border-radius:10px;box-shadow:0 8px 26px #182b5260}
 #s-game .legend{background:#15254b;border-radius:12px;padding:12px;gap:10px 16px}
 #s-game .legend li{background:#263964;border:1px solid #465a8b;padding:5px 8px;border-radius:8px}
 #s-game .hint{font-size:.96rem;line-height:1.7}
+/* 小音量、低干擾的遊戲音效控制 */
+#s-game .sound-settings{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;color:#d1d9f5;font-size:.85rem}
+#s-game .sound-settings label{color:#d1d9f5}
+#soundVolume{width:110px;min-width:0;accent-color:#aab9ee;padding:0;border:0;background:transparent}
+#soundVolumeText{font-variant-numeric:tabular-nums;min-width:36px}
+#btnSound{margin-left:auto}
 </style>
 
 </head>
@@ -241,8 +247,10 @@ details{background:#f5f6fb;border:1px solid #dce1ef;border-radius:12px;padding:1
     <div class="hud">
       <div>時間<b id="hTime">0:00</b></div>
       <div>分數<b id="hScore">0</b></div>
+      <button class="btn alt sm" id="btnSound" type="button" aria-pressed="true" title="開關遊戲音效">🔊 音效開</button>
       <button class="btn alt sm" id="btnPause">暫停</button>
     </div>
+    <div class="sound-settings"><label for="soundVolume">音效音量</label><input id="soundVolume" type="range" min="0" max="100" step="5" value="45" aria-label="音效音量"><span id="soundVolumeText">45%</span></div>
     <canvas id="cv" width="400" height="300" tabindex="0" aria-label="釣魚遊戲畫面，點一下或按空白鍵放下釣鉤"></canvas>
     <p class="hint">點擊海面或按空白鍵放下釣鉤。連續釣到魚會累積連擊加分；國字魚可以複習生字；小心水母會電到釣竿。河豚炸垃圾、章魚噴墨，寶箱有磁鐵、雙倍分數、急速收線，還有定時出現的黃金時刻（分數 ×2）。</p>
     <ul class="legend" id="legend"></ul>
@@ -1348,6 +1356,8 @@ let LESSONS = (() => {
     if (idx < 0) updated.push(lesson);
     else if (lesson.title === "第九課　請到我的家鄉來") {
       updated[idx] = { ...updated[idx], text: lesson.text, words: lesson.words };
+    } else if (lesson.words && !updated[idx].words) {
+      updated[idx] = { ...updated[idx], words: lesson.words };   // 舊版儲存的課文補上生字表
     }
   }
   return updated;
@@ -1594,23 +1604,24 @@ function tint(h, f) {
   return "#" + c.map(v => v.toString(16).padStart(2, "0")).join("");
 }
 function mk(map, pal, c, opt) {
+  // 柔和輪廓：保留原始碰撞尺寸，細化每格內的光影，不再生成粗黑描邊。
   opt = opt || {};
   const rows = map.map(r => [...r]), h0 = rows.length, w0 = Math.max(...rows.map(r => r.length));
-  const cell = (i, j) => (j >= 0 && j < h0 && i >= 0 && i < rows[j].length && pal[rows[j][i]]) ? rows[j][i] : "";
-  const cv = document.createElement("canvas"); cv.width = (w0 + 2) * c; cv.height = (h0 + 2) * c;
-  const x = cv.getContext("2d");
-  const px = (i, j, col) => { x.fillStyle = col; x.fillRect((i + 1) * c, (j + 1) * c, c, c); };
-  for (let j = -1; j <= h0; j++) for (let i = -1; i <= w0; i++) {
-    if (cell(i, j)) continue;
-    if (cell(i - 1, j) || cell(i + 1, j) || cell(i, j - 1) || cell(i, j + 1)) px(i, j, opt.line || "#0b1830");
-  }
-  for (let j = 0; j < h0; j++) for (let i = 0; i < w0; i++) {
-    const ch = cell(i, j); if (!ch) continue;
-    let col = pal[ch];
-    if ("ob".includes(ch) && !opt.flat) {
-      if (!cell(i, j - 1)) col = tint(col, .28); else if (!cell(i, j + 1)) col = tint(col, -.25);
-    }
-    px(i, j, col);
+  const cell = (i, j) => j >= 0 && j < h0 && i >= 0 && i < rows[j].length && pal[rows[j][i]] ? rows[j][i] : '';
+  const cv = document.createElement('canvas'); cv.width = (w0 + 2) * c; cv.height = (h0 + 2) * c;
+  const x = cv.getContext('2d');
+  const put = (i,j,w,h,color) => { x.fillStyle=color; x.fillRect(i,j,w,h); };
+  for (let j=0;j<h0;j++) for (let i=0;i<w0;i++) {
+    const ch=cell(i,j); if (!ch) continue;
+    const col=pal[ch], xx=(i+1)*c, yy=(j+1)*c;
+    // 邊緣只以同色系加深 1 像素，不描繪整圈黑色外框。
+    put(xx,yy,c,c,col);
+    if (!cell(i,j-1)) put(xx,yy,c,1,tint(col,-.17));
+    if (!cell(i-1,j)) put(xx,yy,1,c,tint(col,-.13));
+    if (!cell(i,j+1)) put(xx,yy+c-1,c,1,tint(col,-.28));
+    if (!cell(i+1,j)) put(xx+c-1,yy,1,c,tint(col,-.18));
+    // 微小反光：以 1px 的細節增加精緻度，而非整塊上亮下暗。
+    if (('ob'.includes(ch)) && ((i*11+j*7)%5===0) && c>=2) put(xx+1,yy+1,1,1,tint(col,.34));
   }
   return cv;
 }
@@ -1633,33 +1644,113 @@ const MAPS = {
   star: ["....o....", "...ooo...", "ooooooooo", ".ooooooo.", "..ooooo..", ".ooo.ooo.", ".oo...oo."],
   lfish: ["....oooooo.....", "..oooooooooo..o", ".oowkooooooooo.", "oooooooooooooo.", "oobbbbbbbbbooo.", ".oobbbbbbbbooo.", "..oooooooooo..o", "....oooooo....."],
   lfish2: ["....oooooo.....", "..oooooooooo.oo", ".oowkooooooooo.", "oooooooooooooo.", "oobbbbbbbbbooo.", ".oobbbbbbbbooo.", "..oooooooooo...", "....oooooo....."],
-  boat: [".....ccccc.................", "......fff...................", ".....uuuuu..................", ".....uuuuu..................",
-    "..eeeeeeeeeeeeeeeeeeeeeeee..", ".hhhhhhhhhhhhhhhhhhhhhhhhhh.", "..rrrrrrrrrrrrrrrrrrrrrrrr..", "...hhhhhhhhhhhhhhhhhhhhhh...", "....hhhhhhhhhhhhhhhhhhhh...."],
+  boat: [".......ccccc..................", "......ccccccc.................", ".......fffff..................", ".......ffkff..................",
+    "......uuuuuu..................", "......uuuuuuaaaa..............", "......uuuuuuaa................", "......pppppp..................",
+    "..eeeeeeeeeeeeeeeeeeeeeeeeee..", ".hhhhhhhhhhhhhhhhhhhhhhhhhhhh.", "..rrrrrrrrrrrrrrrrrrrrrrrrrr..", "...hhhhhhhhhhhhhhhhhhhhhhhh...", "....hhhhhhhhhhhhhhhhhhhhhh...."],
   crab: [".r.....r.", "r.......r", ".rrrrrrr.", "rrkrrrkrr", ".rrrrrrr.", "r.r.r.r.r"],
   crab2: [".r.....r.", "r.......r", ".rrrrrrr.", "rrkrrrkrr", ".rrrrrrr.", ".r.r.r.r."]
 };
 const P = (o, b, extra) => Object.assign({ o, b, k: "#0b1220", d: "#12243a", w: "#ffffff", y: "#ffd23f", s: "#e8f3ff", g: "#8d9aa8" }, extra || {});
 const T = {
-  f1: { n: "小魚", spr: "fish", pal: P("#ff9f43", "#ffe0a3"), pts: 10, wt: 1, spd: .45, cnt: 5 },
+  f1: { n: "小魚", spr: "fish", pal: P("#dc86b7", "#f4cde3"), pts: 10, wt: 1, spd: .45, cnt: 5 },
   f2: { n: "藍魚", spr: "fish", pal: P("#3fa7ff", "#bfe3ff"), pts: 25, wt: 1.3, spd: .65, cnt: 3 },
   f3: { n: "燈籠魚", spr: "lantern", pal: P("#7a5bd6", "#c9b8ff", { y: "#fff27a" }), pts: 60, wt: 1.9, spd: .35, cnt: 2 },
   f4: { n: "黃金魚", spr: "gold", pal: P("#ffc928", "#fff0a0", { d: "#b07a00" }), pts: 200, wt: 3, spd: .55, cnt: 1, deep: 1 },
-  pf: { n: "河豚", spr: "puff", pal: P("#e8c75a", "#fff5c8", { s: "#ff6b4a" }), pts: 30, wt: 1.4, spd: .3, cnt: 2, note: "爆炸清垃圾" },
+  pf: { n: "河豚", spr: "puff", pal: P("#d7b86d", "#fff5c8", { s: "#b776ae" }), pts: 30, wt: 1.4, spd: .3, cnt: 2, note: "爆炸清垃圾" },
   oc: { n: "章魚", spr: "octo", pal: P("#a64ac9", "#d9a6ee"), pts: 20, wt: 2, spd: .25, cnt: 1, note: "噴墨變黑" },
   ch: { n: "寶箱", spr: "chest", pal: P("#9a5a22", "#9a5a22", { d: "#4a2c12", b: "#b8742f" }), pts: 0, wt: 2.3, spd: 0, note: "磁鐵・雙倍・加時" },
-  t1: { n: "靴子", spr: "boot", pal: P("#7a5230", "#7a5230", { b: "#7a5230", d: "#3e2a18" }), pts: 0, wt: 3.4, spd: 0, trash: 1, note: "垃圾" },
+  t1: { n: "靴子", spr: "boot", pal: P("#685b78", "#685b78", { b: "#685b78", d: "#332a4d" }), pts: 0, wt: 3.4, spd: 0, trash: 1, note: "垃圾" },
   t2: { n: "罐頭", spr: "can", pal: P("#9aa7b4", "#9aa7b4", { d: "#5d6a78" }), pts: 0, wt: 3.4, spd: 0, trash: 1, note: "垃圾" },
   jf: { n: "水母", spr: "jelly", pal: P("#c77dff", "#e7c9ff", { w: "#f6e8ff" }), pts: 0, wt: 1, spd: .18, cnt: 1, bob: 14, hazard: 1, note: "電擊暈眩" },
   sf: { n: "海星", spr: "star", pal: P("#ff8fa3", "#ffd0d9"), pts: 40, wt: 1.6, spd: 0, cnt: 2, floor: 1 },
-  lf: { n: "國字魚", spr: "lfish", pal: P("#2fc4b2", "#b9f3ea"), pts: 50, wt: 1.5, spd: .4, cnt: 1, learn: 1, note: "複習生字" }
+  lf: { n: "國字魚", spr: "lfish", pal: P("#8d80d5", "#d9cff8"), pts: 50, wt: 1.5, spd: .4, cnt: 1, learn: 1, note: "複習生字" }
 };
-for (const k in T) {
-  const f = [mk(MAPS[T[k].spr], T[k].pal, 2)];
-  if (MAPS[T[k].spr + "2"]) f.push(mk(MAPS[T[k].spr + "2"], T[k].pal, 2));
-  T[k].frames = f; T[k].img = f[0];
+// 精緻像素魚群：以較小的色塊重繪，保持原碰撞尺寸、物種及計分不變。
+// 使用離屏 Canvas 生成動畫幀，無外部圖片依賴。
+function detailedFish(kind, palette, phase=0) {
+  const source = MAPS[kind], scale=2;
+  const width=Math.max(...source.map(r=>r.length))*scale+4, height=source.length*scale+4;
+  const c=document.createElement('canvas');c.width=width;c.height=height;
+  const q=c.getContext('2d');q.imageSmoothingEnabled=false;
+  const cells=source.map(r=>[...r]);
+  const at=(x,y)=> y>=0&&y<cells.length&&x>=0&&x<cells[y].length ? cells[y][x]:'.';
+  const paint=(x,y,w,h,color)=>{q.fillStyle=color;q.fillRect(x,y,w,h)};
+  const fishLike=/^(fish|gold|lantern|lfish)/.test(kind);
+  for(let y=0;y<cells.length;y++)for(let x=0;x<cells[y].length;x++){
+    const ch=at(x,y);if(ch==='.'||!palette[ch])continue;
+    const px=x*scale+2,py=y*scale+2,base=palette[ch];
+    // 主色階依水下統一的左上柔光、右下柔影；不生成全黑描邊。
+    paint(px,py,2,2,base);
+    if(at(x,y-1)==='.')paint(px,py,2,1,tint(base,.25));
+    if(at(x-1,y)==='.')paint(px,py,1,2,tint(base,.14));
+    if(at(x,y+1)==='.')paint(px,py+1,2,1,tint(base,-.23));
+    if(at(x+1,y)==='.')paint(px+1,py,1,2,tint(base,-.15));
+    if((x*7+y*11)%9===0&&ch==='o')paint(px+1,py,1,1,tint(base,.3));
+    if(ch==='k')paint(px,py,2,2,'#243554');
+    if(ch==='w')paint(px,py,2,1,'#fff9fc');
+  }
+  if(fishLike){
+    // 背鰭：階梯狀細緻輪廓，依品種改變高度與形狀。
+    const dorsal=kind.startsWith('gold')?5:kind.startsWith('lantern')?3:kind.startsWith('lfish')?4:3;
+    const base=palette.o||'#93a2d2';
+    for(let j=0;j<dorsal;j++){
+      const xx=Math.round(width*.47)+j*2, yy=2+Math.max(0,dorsal-j-1);
+      paint(xx,yy,2,2,tint(base,j%2?.22:-.10));
+    }
+    // 腹鰭隨擺尾略微擺動，細小亮邊不使用黑色輪廓。
+    const flap=phase?2:0;
+    paint(Math.round(width*.50),height-4+flap,4,1,tint(base,-.12));
+    paint(Math.round(width*.52),height-3+flap,2,1,tint(base,.26));
+    // 半透明魚鰭、魚鱗與亮面，分散細節但不改變角色輪廓。
+    const body=palette.o||'#93a2d2';
+    q.globalAlpha=.65;
+    for(let x=4;x<width-6;x+=5){
+      const y=Math.floor(height*.52+Math.sin(x*.75+phase)*1.5);
+      if(q.getImageData(x,y,1,1).data[3])paint(x,y,1,1,tint(body,.45));
+    }
+    q.globalAlpha=1;
+    const tail=phase?2:0, tx=width-5, cy=Math.floor(height/2);
+    if(kind.startsWith('fish')||kind.startsWith('gold')||kind.startsWith('lfish')||kind.startsWith('lantern')){
+      // 尾鰭呈上下分叉，兩幀上下擺動；黃金魚有更長的飄帶尾。
+      const long=kind.startsWith('gold')?4:kind.startsWith('lfish')?3:2;
+      for(let j=0;j<long;j++){
+        paint(tx+j,cy-2-j+(tail?1:0),2,1,tint(body,.16+j*.05));
+        paint(tx+j,cy+2+j-(tail?1:0),2,1,tint(body,-.08));
+      }
+      paint(tx,cy,3,2,tint(body,.22));
+    }
+    // 魚鰓：一個小像素暗點，避免表情僵硬。
+    paint(Math.round(width*.34),Math.round(height*.58),1,2,tint(body,-.22));
+  }
+  if(kind.startsWith('octo')){
+    // 章魚額頭的柔光與兩個可愛的臉頰點
+    paint(Math.round(width*.46),4,3,1,tint(palette.o,.4));
+    paint(Math.round(width*.36),Math.round(height*.55),1,1,tint(palette.o,.42));
+    paint(Math.round(width*.64),Math.round(height*.55),1,1,tint(palette.o,.42));
+  }
+  if(kind.startsWith('puff')){
+    for(let i=0;i<4;i++){
+      const x=5+i*4,y=3+(i%2);
+      paint(x,y,1,1,tint(palette.o,.4));
+    }
+  }
+  // 細緻的同色系暗邊（1px，不是黑框），讓魚在海水裡更容易辨識。
+  { const o = q.getImageData(0, 0, width, height), a = o.data, edge = tint(palette.o || '#93a2d2', -.55);
+    const on = (x, y) => x >= 0 && y >= 0 && x < width && y < height && a[(y * width + x) * 4 + 3] > 0;
+    const pts = [];
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (!on(x, y) && (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1))) pts.push([x, y]);
+    q.globalAlpha = .85; pts.forEach(([x, y]) => paint(x, y, 1, 1, edge)); q.globalAlpha = 1; }
+  return c;
 }
-const BOAT = mk(MAPS.boat, { c: "#ffd23f", f: "#ffd3a8", u: "#5b6fd6", e: "#d9ab68", h: "#8b5a2b", r: "#d94f6b" }, 2);
-const CRAB = [mk(MAPS.crab, { r: "#ff6b6b", k: "#0b1220" }, 2), mk(MAPS.crab2, { r: "#ff6b6b", k: "#0b1220" }, 2)];
+for (const k in T) {
+  const d=T[k], spr=d.spr;
+  const organic=/^(fish|lantern|gold|puff|octo|jelly|star|lfish)$/.test(spr);
+  const f=[organic?detailedFish(spr,d.pal,0):mk(MAPS[spr],d.pal,2)];
+  if(MAPS[spr+'2'])f.push(organic?detailedFish(spr+'2',d.pal,1):mk(MAPS[spr+'2'],d.pal,2));
+  d.frames=f;d.img=f[0];
+}
+const BOAT = mk(MAPS.boat, { c: "#f1dbad", f: "#ffd3cf", k: "#2c2b4e", u: "#7471b8", a: "#ffd3cf", p: "#4b4a86", e: "#c3a4a8", h: "#685077", r: "#ab719c" }, 2);
+const CRAB = [mk(MAPS.crab, { r: "#bf79ad", k: "#0b1220" }, 2), mk(MAPS.crab2, { r: "#bf79ad", k: "#0b1220" }, 2)];
 (function legend() {
   const ul = $("#legend");
   ["f1", "f2", "f3", "f4", "sf", "lf", "pf", "oc", "jf", "ch", "t1"].forEach(k => {
@@ -1677,6 +1768,9 @@ const CRAB = [mk(MAPS.crab, { r: "#ff6b6b", k: "#0b1220" }, 2), mk(MAPS.crab2, {
 const cv = $("#cv"), g = cv.getContext("2d");
 g.imageSmoothingEnabled = false;
 const W = 400, H = 300, SEA = 52, OX = 200, OY = SEA - 22, MINLEN = 12;
+// 內部解析度放大 2～3 倍：像素角色維持方塊感，文字、漸層和光暈則更清晰。
+const SC = (window.devicePixelRatio || 1) >= 2.5 ? 3 : 2;
+cv.width = W * SC; cv.height = H * SC; g.imageSmoothingEnabled = false;
 let G = null;
 
 function spawn(k) {
@@ -1708,6 +1802,83 @@ function splash(x, y) {
   for (let i = 0; i < 10; i++) G.fx.push({ x, y, vx: (Math.random() - .5) * 60, vy: -40 - Math.random() * 40, gy: 160, life: .55, c: "#eaf8ff", sz: 2 });
 }
 function note(x, y, s, c) { G.txt.push({ s, x: Math.max(48, Math.min(W - 48, x)), y, life: 1.5, c: c || "#ffe45e" }); }
+
+/* 原生 Web Audio 音效：不載入外部 MP3，不持續播放背景音樂。 */
+const AUDIO = (() => {
+  let ctx = null, lastCombo = 0;
+  let enabled = ls.get("fishing_sound_on", true) !== false;
+  let volume = Math.max(0, Math.min(1, Number(ls.get("fishing_sound_volume", .45)) || 0));
+  const AC = window.AudioContext || window.webkitAudioContext;
+  function ready() {
+    if (!enabled || !AC) return null;
+    try {
+      if (!ctx) ctx = new AC();
+      if (ctx.state === "suspended") ctx.resume().catch(()=>{});
+      return ctx;
+    } catch (_) { return null; }
+  }
+  function tone(freq, duration=.12, type="sine", gain=.18, delay=0, endFreq=null) {
+    const a=ready(); if(!a) return;
+    const now=a.currentTime+delay;
+    const osc=a.createOscillator(), env=a.createGain();
+    osc.type=type; osc.frequency.setValueAtTime(Math.max(30,freq),now);
+    if(endFreq) osc.frequency.exponentialRampToValueAtTime(Math.max(30,endFreq),now+duration);
+    env.gain.setValueAtTime(.0001,now);
+    env.gain.exponentialRampToValueAtTime(Math.max(.0002,gain*volume),now+.012);
+    env.gain.exponentialRampToValueAtTime(.0001,now+duration);
+    osc.connect(env); env.connect(a.destination);
+    osc.start(now); osc.stop(now+duration+.025);
+  }
+  function noise(duration=.13,gain=.10,delay=0,highpass=300) {
+    const a=ready(); if(!a) return;
+    const n=Math.max(1,Math.ceil(a.sampleRate*duration));
+    const buffer=a.createBuffer(1,n,a.sampleRate), data=buffer.getChannelData(0);
+    for(let i=0;i<n;i++) data[i]=(Math.random()*2-1)*(1-i/n);
+    const source=a.createBufferSource(),filter=a.createBiquadFilter(),env=a.createGain();
+    source.buffer=buffer;filter.type="highpass";filter.frequency.value=highpass;
+    const at=a.currentTime+delay;
+    env.gain.setValueAtTime(Math.max(.0001,gain*volume),at);
+    env.gain.exponentialRampToValueAtTime(.0001,at+duration);
+    source.connect(filter);filter.connect(env);env.connect(a.destination);
+    source.start(at);source.stop(at+duration);
+  }
+  function play(event,detail=0) {
+    if (!enabled || volume===0) return;
+    switch(event) {
+      case "cast": tone(380,.085,"sine",.09,0,220);break;
+      case "splash": noise(.13,.075,0,550);tone(240,.12,"sine",.08,0,110);break;
+      case "catch":
+        tone(510,.10,"sine",.14);tone(730,.15,"sine",.12,.075);break;
+      case "goldfish":
+        tone(660,.11,"sine",.15);tone(880,.14,"sine",.14,.10);tone(1175,.22,"sine",.12,.22);break;
+      case "word":
+        tone(494,.11,"triangle",.12);tone(659,.12,"triangle",.12,.12);tone(880,.20,"sine",.11,.25);break;
+      case "chest":
+        [523,659,784,1047].forEach((f,i)=>tone(f,.18,"sine",.13,i*.105));break;
+      case "combo":
+        if(detail>=5){[659,784,988].forEach((f,i)=>tone(f,.15,"triangle",.11,i*.095));}
+        break;
+      case "trash":tone(210,.17,"triangle",.13,0,115);tone(140,.16,"sine",.09,.11,82);break;
+      case "zap":noise(.21,.13,0,1100);tone(165,.20,"sawtooth",.075,0,85);break;
+      case "puffer":noise(.27,.17,0,250);tone(110,.28,"triangle",.14,0,55);break;
+      case "ink":tone(300,.13,"triangle",.11,0,160);noise(.16,.045,.05,450);break;
+      case "golden": [440,554,659].forEach((f,i)=>tone(f,.19,"sine",.10,i*.12));break;
+      case "tick":tone(1040,.045,"square",.04);break;
+      case "empty":tone(280,.075,"sine",.045,0,240);break;
+      case "end":tone(523,.18,"sine",.11);tone(392,.25,"sine",.10,.17);break;
+    }
+  }
+  function setEnabled(value) {enabled=!!value;ls.set("fishing_sound_on",enabled);if(enabled)ready();refresh();}
+  function setVolume(value) {volume=Math.max(0,Math.min(1,Number(value)||0));ls.set("fishing_sound_volume",volume);refresh();}
+  function refresh() {
+    const b=$("#btnSound"),v=$("#soundVolume"),t=$("#soundVolumeText");
+    if(b){b.textContent=enabled?"🔊 音效開":"🔇 音效關";b.setAttribute("aria-pressed",String(enabled));}
+    if(v)v.value=Math.round(volume*100);
+    if(t)t.textContent=Math.round(volume*100)+"%";
+  }
+  return {play,ready,setEnabled,setVolume,refresh,isEnabled:()=>enabled};
+})();
+
 const mult = () => (G.gold > 0 || G.dbl > 0) ? 2 : 1;
 function gain(p, x, y) {
   p *= mult();
@@ -1720,7 +1891,7 @@ function gain(p, x, y) {
 }
 function comboUp(x, y) {
   G.combo++; if (G.combo > S.maxCombo) S.maxCombo = G.combo;
-  if (G.combo % 5 === 0) { note(x, y - 40, "連擊 " + G.combo + "！太厲害了", "#f2d8ff"); boom(OX, SEA, 18); }
+  if (G.combo % 5 === 0) { AUDIO.play("combo",G.combo); note(x, y - 40, "連擊 " + G.combo + "！太厲害了", "#f2d8ff"); boom(OX, SEA, 18); }
 }
 function comboBreak(x, y) { if (G.combo >= 3) note(x, y, "連擊中斷", "#b7c4de"); G.combo = 0; }
 function removeObj(o) { const i = G.objs.indexOf(o); if (i >= 0) G.objs.splice(i, 1); }
@@ -1730,23 +1901,24 @@ function onCatch(o) {
   if (o.k === "pf") {
     let n = 0;
     G.objs.slice().forEach(t => { if (T[t.k].trash && Math.hypot(t.x - o.x, t.y - o.y) < 75) { boom(t.x, t.y, 14); removeObj(t); n++; } });
-    boom(o.x, o.y, 34); removeObj(o); h.obj = null; G.shake = .35;
+    AUDIO.play("puffer"); boom(o.x, o.y, 34); removeObj(o); h.obj = null; G.shake = .35;
     S.caught.pf = (S.caught.pf || 0) + 1;
     comboUp(o.x, o.y);
     gain(T.pf.pts, o.x, o.y - 12);
     note(o.x, o.y - 26, n ? "砰！炸掉 " + n + " 件垃圾" : "砰！", "#ffb05a");
   } else if (o.k === "oc") {
-    G.ink = 5; note(o.x, o.y - 12, "章魚噴墨！", "#d9a6ee");
+    G.ink = 5; AUDIO.play("ink"); note(o.x, o.y - 12, "章魚噴墨！", "#d9a6ee");
   } else if (o.k === "jf") {
     S.caught.jf = (S.caught.jf || 0) + 1;
     removeObj(o); h.obj = null;
-    G.stun = 1.6; G.flash = .5; G.shake = .3;
+    AUDIO.play("zap"); G.stun = 1.6; G.flash = .5; G.shake = .3;
     comboBreak(o.x, o.y - 14);
     boom(o.x, o.y, 22);
     note(o.x, o.y - 14, "觸電！釣竿暈眩", "#e7c9ff");
   }
 }
 function chest(x, y) {
+  AUDIO.play("chest");
   const r = Math.random();
   if (r < .22) { G.t += 10; note(x, y, "寶箱：遊戲時間 +10 秒！", "#8be9a8"); }
   else if (r < .40) {
@@ -1759,15 +1931,18 @@ function chest(x, y) {
   boom(x, y + 8, 18);
 }
 function learnCatch(o, x, y) {
+  AUDIO.play("word");
   S.learned.push(o.ch);
   note(x, y - 40, "學會「" + o.word.items[0].replace("□", o.ch) + "」", "#9ff3e4");
 }
 function reward(o) {
   S.caught[o.k] = (S.caught[o.k] || 0) + 1;
   const d = T[o.k], x = OX, y = SEA - 8;
-  if (d.trash) { note(x, y, "是垃圾…", "#b7c4de"); comboBreak(x, y - 14); }
+  G.rings.push({ x: OX, y: SEA - 4, t: 0 });
+  if (d.trash) { AUDIO.play("trash"); note(x, y, "是垃圾…", "#b7c4de"); comboBreak(x, y - 14); }
   else if (o.k === "ch") chest(x, y);
   else {
+    if (!d.learn) AUDIO.play(o.k === "f4" ? "goldfish" : "catch");
     comboUp(x, y);
     gain(d.pts, x, y);
     if (d.learn) learnCatch(o, x, y);
@@ -1779,10 +1954,12 @@ function update(dt) {
   G.t -= dt;
   if (G.t <= 0) { G.t = 0; endGame(false); return; }
   for (const k of ["ink", "mag", "dbl", "fast", "stun", "shake", "flash", "gold"]) if (G[k] > 0) G[k] = Math.max(0, G[k] - dt);
+  { const sec = Math.ceil(G.t); if (G.t <= 10 && sec !== G.lastTick) { G.lastTick = sec; AUDIO.play("tick"); $("#hTime").style.color = "#ff9aa8"; } }
+  G.rings.forEach(r => r.t += dt); G.rings = G.rings.filter(r => r.t < .4);
   G.goldIn -= dt;
   if (G.goldIn <= 0 && G.gold <= 0) {
     G.gold = 8; G.goldIn = 30 + Math.random() * 15;
-    note(W / 2, SEA + 36, "黃金時刻！分數 ×2", "#ffe45e"); boom(W / 2, SEA + 36, 26);
+    AUDIO.play("golden"); note(W / 2, SEA + 36, "黃金時刻！分數 ×2", "#ffe45e"); boom(W / 2, SEA + 36, 26);
   }
   G.objs.forEach(o => {
     if (o.caught) return;
@@ -1805,13 +1982,14 @@ function update(dt) {
   } else if (h.st === "out") {
     h.len += 4.2 * f;
     const p = tip();
-    if (!h.wet && p.y > SEA) { h.wet = true; splash(p.x, SEA); }
+    if (h.wet && Math.random() < .5 * f) G.fx.push({ x: p.x + (Math.random() - .5) * 4, y: p.y - 2, vx: 0, vy: -14, life: .9, c: "#d9f1ff", sz: 2 });
+    if (!h.wet && p.y > SEA) { h.wet = true; AUDIO.play("splash"); splash(p.x, SEA); }
     const hit = G.objs.find(o => {
       if (o.caught) return false;
       const d = T[o.k], m = (G.mag > 0 && !d.trash && !d.hazard) ? 14 : 0;
       return Math.abs(p.x - o.x) < o.w / 2 + 1 + m && Math.abs(p.y - o.y) < o.h / 2 + 2 + m * .7;
     });
-    if (hit) { h.obj = hit; hit.caught = true; h.st = "back"; onCatch(hit); }
+    if (hit) { h.obj = hit; hit.caught = true; h.st = "back"; G.rings.push({ x: hit.x, y: hit.y, t: 0 }); onCatch(hit); }
     else if (p.x < 3 || p.x > W - 3 || p.y > H - 12) h.st = "back";
   } else {
     h.len -= (h.obj ? 4.2 / T[h.obj.k].wt : 5.5) * f * (G.fast > 0 ? 1.8 : 1);
@@ -1819,7 +1997,7 @@ function update(dt) {
     if (h.len <= MINLEN) {
       h.len = MINLEN; h.st = "swing";
       if (h.obj) { const o = h.obj; h.obj = null; reward(o); }
-      else if (!h.got) comboBreak(OX, SEA - 8);
+      else if (!h.got) { AUDIO.play("empty"); comboBreak(OX, SEA - 8); }
     }
   }
   G.spawnT += dt; G.trashT += dt; G.chestT += dt;
@@ -1835,72 +2013,81 @@ function update(dt) {
   G.txt = G.txt.filter(t => t.life > 0);
   $("#hTime").textContent = fmt(G.t);
 }
+// 畫面隨裝置時間選擇晨／晝／暮／夜，並以遊戲時間慢慢推進。
+const SKY_THEMES = [
+  {name:'晨曦', sky:['#536a9c','#9eaccf','#e1d8df'], sea:['#81b7d3','#598ebc','#244f83'], sun:'#f6e9c6'},
+  {name:'晴晝', sky:['#547da9','#a2c9e0','#d5e9ef'], sea:['#76b7d4','#477fae','#234f83'], sun:'#f7efce'},
+  {name:'暮色', sky:['#4a507f','#9c89b2','#e0bac5'], sea:['#7498c4','#4c6fa2','#243f75'], sun:'#f6d8d3'},
+  {name:'月夜', sky:['#202e5a','#56628d','#9299bc'], sea:['#426e9f','#315783','#172e5b'], sun:'#e9e9ff'}
+];
+function seaTheme(tk) {
+  const elapsed=(G && G.tick ? G.tick / 60 : 0);
+  // 每 75 秒推進一個時段；遊戲開始時參照當地時間。
+  const stage=((G && Number.isFinite(G.dayStage) ? G.dayStage : 1)+elapsed/75)%4;
+  const a=Math.floor(stage), b=(a+1)%4, mix=stage-a;
+  const blend=(x,y)=>{
+    const rgb=z=>[1,3,5].map(i=>parseInt(z.slice(i,i+2),16));
+    const u=rgb(x),v=rgb(y);
+    return '#'+u.map((n,i)=>Math.round(n+(v[i]-n)*mix).toString(16).padStart(2,'0')).join('');
+  };
+  return {name:SKY_THEMES[a].name,sky:SKY_THEMES[a].sky.map((x,i)=>blend(x,SKY_THEMES[b].sky[i])),sea:SKY_THEMES[a].sea.map((x,i)=>blend(x,SKY_THEMES[b].sea[i])),sun:blend(SKY_THEMES[a].sun,SKY_THEMES[b].sun)};
+}
 function drawBackground(tk) {
-  const sky = ["#5db8f0", "#78c6f5", "#95d4fa", "#b3e2fd", "#cdeeff"], sh = Math.ceil(SEA / 5);
-  sky.forEach((c, i) => { g.fillStyle = c; g.fillRect(-4, i * sh, W + 8, sh); });
-  // 太陽與光芒
-  g.fillStyle = "#ffe97a"; g.fillRect(350, 8, 12, 12); g.fillRect(348, 10, 16, 8); g.fillRect(352, 6, 8, 16);
-  g.fillStyle = "#fff6bf";
-  for (let a = 0; a < 8; a++) {
-    const ang = a * Math.PI / 4 + tk * .01, r = 15 + ((tk >> 4) & 1) * 2;
-    g.fillRect(Math.round(356 + Math.cos(ang) * r) - 1, Math.round(14 + Math.sin(ang) * r) - 1, 3, 3);
-  }
-  // 雲
-  g.fillStyle = "rgba(255,255,255,.9)";
-  [[(tk * .06) % 520 - 70, 8], [(tk * .04 + 230) % 520 - 70, 20]].forEach(([x, y]) => {
-    x = Math.round(x); g.fillRect(x, y + 6, 38, 6); g.fillRect(x + 6, y + 2, 22, 6); g.fillRect(x + 22, y + 4, 16, 6);
-  });
-  // 海水（分層）
-  const nb = 10, bh = (H - SEA) / nb, a = [58, 154, 226], z = [14, 48, 104];
-  for (let i = 0; i < nb; i++) {
-    const t = i / (nb - 1);
-    g.fillStyle = "rgb(" + a.map((v, j) => Math.round(v + (z[j] - v) * t)).join(",") + ")";
-    g.fillRect(-4, Math.round(SEA + i * bh), W + 8, Math.ceil(bh) + 1);
-  }
-  // 光束
-  g.save(); g.globalAlpha = .12; g.fillStyle = "#e6f2ff";
-  for (let i = 0; i < 4; i++) {
-    const drift = Math.sin(tk * .008 + i * 1.8) * 15;
-    g.beginPath(); g.moveTo(40 + i * 105 + drift, SEA); g.lineTo(64 + i * 105 + drift, SEA);
-    g.lineTo(132 + i * 105 + drift, H - 12); g.lineTo(20 + i * 105 + drift, H - 12); g.closePath(); g.fill();
-  }
+  // 精緻像素海景：遠景安靜、前景細緻，色彩以靛藍／霧紫／月光藍為主。
+  const pix=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));};
+  const sea=SEA, t=tk, theme=seaTheme(tk);
+  const sky=g.createLinearGradient(0,0,0,sea);
+  sky.addColorStop(0,theme.sky[0]);sky.addColorStop(.72,theme.sky[1]);sky.addColorStop(1,theme.sky[2]);
+  g.fillStyle=sky;g.fillRect(0,0,W,sea);
+  // 柔和月光般的日輪，細小像素光暈。
+  const sunX=342,sunY=16;
+  for(let r=13;r>=7;r-=2){g.globalAlpha=r>9?.10:1;for(let y=-r;y<=r;y+=2){const w=Math.floor(Math.sqrt(r*r-y*y));pix(sunX-w,sunY+y,w*2,2,r>9?'#e6e4fa':theme.sun);}}g.globalAlpha=1;
+  for(let i=0;i<12;i++){const a=i*2.4+t*.004;pix(sunX+Math.cos(a)*19,sunY+Math.sin(a)*15,1,1,'#f7f1ed');}
+  const cloud=(x,y,scale)=>{g.save();g.translate(Math.round(x),y);g.scale(scale,scale);pix(0,7,38,4,'#d7d5ed');pix(6,4,27,6,'#f1eff9');pix(12,1,15,5,'#faf8ff');pix(7,11,27,1,'#b7bbdc');g.restore();};
+  cloud((t*.045+16)%(W+80)-40,12,.75);cloud((t*.027+230)%(W+90)-50,30,.6);
+  const water=g.createLinearGradient(0,sea,0,H);
+  water.addColorStop(0,theme.sea[0]);water.addColorStop(.35,theme.sea[1]);water.addColorStop(1,theme.sea[2]);
+  g.fillStyle=water;g.fillRect(0,sea,W,H-sea);
+  // 海面碎光與輕微漣漪。
+  for(let i=0;i<36;i++){let x=(i*43+Math.round(t*(i%2?.12:-.09))+W*30)%W;pix(x,sea+i%3,5+i%5,1,i%4?'#b0d1e5':'#e0e7f4');}
+  // 半透明的柔光束，刻意保持很低對比。
+  g.save();g.globalAlpha=.045;
+  for(let i=0;i<4;i++){let x=18+i*112+Math.sin(t*.004+i)*8;g.fillStyle='#e7e8ff';g.beginPath();g.moveTo(x,sea);g.lineTo(x+12,sea);g.lineTo(x+56,H);g.lineTo(x-35,H);g.closePath();g.fill();}
   g.restore();
-  // 遠景遺跡
-  g.fillStyle = "#16306a";
-  for (const [x, y, w, h] of [[28, 229, 19, 59], [51, 246, 28, 42], [280, 232, 18, 56], [302, 249, 42, 39]]) { g.fillRect(x, y, w, h); g.fillRect(x - 3, y, w + 6, 5); }
-  g.fillStyle = "#27478a";
-  for (const [x, y, w] of [[33, 238, 5], [57, 254, 6], [285, 242, 5], [312, 258, 8]]) g.fillRect(x, y, w, 3);
-  // 背景氣泡
-  for (let i = 0; i < 14; i++) {
-    const x = (i * 79 + 17) % W, y = H - ((tk * (.22 + i % 3 * .11) + i * 37) % (H - SEA));
-    g.fillStyle = i % 3 ? "#8bbbe0" : "#d6d3ff"; g.globalAlpha = .25 + .15 * (i % 3);
-    g.fillRect(Math.round(x + Math.sin(tk * .016 + i) * 5), Math.round(y), i % 4 === 0 ? 3 : 2, i % 4 === 0 ? 3 : 2);
-  }
-  g.globalAlpha = 1;
-  // 沙地
-  g.fillStyle = "#e8c37a"; g.fillRect(0, H - 12, W, 12);
-  g.fillStyle = "#f3d994"; g.fillRect(0, H - 12, W, 2);
-  g.fillStyle = "#c9a15a"; for (let x = 4; x < W; x += 22) g.fillRect(x, H - 6, 3, 2);
-  g.fillStyle = "#7d8fb5"; for (const x of [90, 205, 340]) { g.fillRect(x, H - 17, 14, 6); g.fillRect(x + 3, H - 21, 8, 5); }
-  g.fillStyle = "#fff4e0"; for (const x of [60, 170, 262, 372]) { g.fillRect(x, H - 9, 4, 3); g.fillRect(x + 1, H - 10, 2, 1); }
-  // 珊瑚
-  [[36, "#d86fb3"], [150, "#ff8fa3"], [238, "#b56bd6"], [318, "#ff8fa3"], [374, "#d86fb3"]].forEach(([x, c]) => {
-    g.fillStyle = c; g.fillRect(x, H - 26, 4, 14); g.fillRect(x - 5, H - 32, 4, 10); g.fillRect(x + 5, H - 30, 4, 8); g.fillRect(x - 5, H - 24, 14, 3);
-    g.fillStyle = tint(c, .35); g.fillRect(x, H - 26, 2, 3); g.fillRect(x - 5, H - 32, 2, 2); g.fillRect(x + 5, H - 30, 2, 2);
-  });
-  // 海草（隨水流擺動）
-  [[14, 7], [64, 9], [126, 6], [200, 8], [278, 7], [352, 9], [391, 6]].forEach(([bx, n], i) => {
-    for (let j = 0; j < n; j++) {
-      const sway = Math.round(Math.sin(tk * .03 + j * .45 + i * 1.7) * (1 + j * .3));
-      g.fillStyle = j % 2 ? "#3fbfa0" : "#2f9f8a"; g.fillRect(bx + sway, H - 12 - (j + 1) * 5, 4, 5);
-    }
-  });
-  // 螃蟹
-  g.drawImage(CRAB[(tk >> 4) & 1], Math.round(G.crab.x), H - 12 - CRAB[0].height + 4);
+  // 四層遠景：山崖、沉船輪廓、古石門，避免搶走魚群焦點。
+  function ridge(base,amp,color,phase){g.fillStyle=color;g.beginPath();g.moveTo(0,H);g.lineTo(0,base);for(let x=0;x<=W+5;x+=5){const y=base-Math.sin((x+phase)/62)*amp-Math.sin((x+phase)/23)*amp*.25;g.lineTo(x,Math.round(y/2)*2);}g.lineTo(W,H);g.fill();}
+  ridge(214,13,'#315987',t*.012);ridge(239,10,'#284b7b',t*.023);ridge(263,8,'#24436f',t*.032);
+  // 沉船剪影：木紋與破帆保留在中遠景，不再以黑色大塊描邊。
+  g.save();g.translate(71,233);g.rotate(-.09);
+  pix(-42,18,92,5,'#293d69');pix(-35,23,78,7,'#24365e');pix(-24,30,54,4,'#1d3158');
+  pix(6,-51,3,70,'#53628a');pix(8,-49,2,65,'#7885a9');pix(10,-43,32,2,'#586b91');
+  pix(12,-40,27,26,'#7784ad');pix(14,-37,23,21,'#a1a5c6');pix(14,-16,24,2,'#626e9a');
+  for(let i=0;i<4;i++)pix(-25+i*19,23,8,1,'#66749a');
+  g.restore();
+  // 海底遺跡：柱身和缺角採局部像素紋理。
+  pix(307,219,12,54,'#304a78');pix(367,221,12,52,'#304a78');
+  pix(304,211,78,8,'#405783');pix(311,205,66,6,'#4e6391');pix(329,219,39,54,'#233c6a');
+  pix(337,229,23,44,'#1b325c');pix(342,225,13,3,'#6578a3');
+  for(let j=0;j<5;j++){pix(309,226+j*9,9,1,'#6579a1');pix(370,225+j*9,7,1,'#6579a1');}
+  // 漂浮的細小懸浮物，分散且緩慢。
+  for(let i=0;i<35;i++){const z=i%3, x=(i*83+31+Math.sin(t*.007+i)*5)%W,y=H-((i*47+t*(.08+z*.05))%(H-sea));g.globalAlpha=.15+z*.09;pix(x,y,z===2?2:1,z===2?2:1,z===0?'#b7a6d6':'#d0e5f2');}g.globalAlpha=1;
+  // 砂質海床與細小貝殼，取代厚重的方形地板。
+  pix(0,280,W,20,'#263c69');
+  for(let x=0;x<W;x+=3){const y=278+Math.round(Math.sin(x*.06)*2+Math.sin(x*.19)*1.5);pix(x,y,3,H-y,'#2b416e');}
+  for(let i=0;i<65;i++){const x=(i*71+19)%W,y=284+(i*13)%15;pix(x,y,1+i%3,1,i%5===0?'#b4a7ca':i%3===0?'#7087ac':'#536b98');}
+  // 層次更細的海草：細莖、兩側小葉；色調壓低以襯托角色。
+  const weed=(bx,by,height,phase)=>{for(let j=0;j<height;j+=3){const sway=Math.round(Math.sin(t*.025+phase+j*.085)*(j/height)*5);const x=bx+sway,y=by-j;pix(x,y,2,3,j%2?'#657bad':'#7288b6');if(j>6&&j%9===0){pix(x-4,y-1,4,2,'#788ab9');pix(x+2,y-4,4,2,'#5c76a9');}}};
+  weed(15,281,34,1);weed(111,283,25,2);weed(241,282,30,3);weed(289,283,24,4);weed(389,282,37,5);
+  // 精緻的珊瑚：細枝、局部反光，避免鮮豔色塊。
+  const coral=(x,y,c)=>{pix(x,y-19,3,19,c);pix(x-6,y-15,3,11,c);pix(x+6,y-17,3,13,c);pix(x-6,y-15,8,2,c);pix(x+2,y-17,7,2,c);pix(x+1,y-18,1,9,'#c3a7d4');};
+  coral(145,281,'#8b78ae');coral(266,283,'#917cb7');coral(370,282,'#a184b7');
+  for(const [x,y] of [[46,281],[188,285],[295,282]]){pix(x,y,16,4,'#465a85');pix(x+3,y-4,10,4,'#5b6f9a');pix(x+6,y-4,3,1,'#8e9bc0');}
+  g.drawImage(CRAB[(t>>4)&1],Math.round(G.crab.x),H-14-CRAB[0].height);
 }
 function draw() {
   const tk = G.tick;
   g.save();
+  g.setTransform(SC, 0, 0, SC, 0, 0); g.imageSmoothingEnabled = false;
   if (G.shake > 0) g.translate(Math.round((Math.random() - .5) * 5), Math.round((Math.random() - .5) * 5));
   drawBackground(tk);
   g.fillStyle = "#cdeeff";
@@ -1908,23 +2095,39 @@ function draw() {
   // 魚群與物件
   G.objs.forEach(o => {
     const d = T[o.k], fr = d.frames[d.frames.length > 1 ? ((tk >> 4) + Math.floor(o.ph * 3)) & 1 : 0];
-    const bob = (o.caught || d.floor || d.trash || d.bob || !d.spd) ? 0 : Math.round(Math.sin(tk * .08 + o.ph));
+    const bob = (o.caught || d.floor || d.trash || d.bob || !d.spd) ? 0 : Math.round(Math.sin(tk * .055 + o.ph));
     const x = Math.round(o.x - fr.width / 2), y = Math.round(o.y - fr.height / 2) + bob;
     const flip = o.v > 0;
     if (flip) { g.save(); g.translate(Math.round(o.x + fr.width / 2), 0); g.scale(-1, 1); g.drawImage(fr, 0, y); g.restore(); }
     else g.drawImage(fr, x, y);
-    if (d.learn) {
-      const lx = Math.round(o.x + (flip ? 3 : -3)), ly = Math.round(o.y + 4 + bob);
-      g.fillStyle = "#fffdf4"; g.fillRect(lx - 8, ly - 8, 16, 16); g.fillStyle = "#1c6f66"; g.fillRect(lx - 8, ly - 8, 16, 1); g.fillRect(lx - 8, ly + 7, 16, 1);
-      g.fillStyle = "#16324a"; g.font = "14px DotGothic16, 'PingFang TC', 'Microsoft JhengHei', sans-serif"; g.textAlign = "center"; g.fillText(o.ch, lx, ly + 5);
+    if (o.k === "f4" && ((tk + Math.floor(o.ph * 20)) % 48) < 6) {
+      const sx = Math.round(o.x + Math.sin(o.ph * 9) * 8), sy = Math.round(o.y - 6 + Math.cos(o.ph * 7) * 4);
+      g.fillStyle = "#fffbe0"; g.fillRect(sx - 3, sy, 7, 1); g.fillRect(sx, sy - 3, 1, 7);
+    }
+    if (d.learn && o.ch) {
+      // 生字拖吊牌：掛在魚尾後方，不覆蓋魚身；避免文字像貼紙。
+      const tailSide = flip ? -1 : 1;
+      const attachX = Math.round(o.x + tailSide * (fr.width/2-2));
+      const tagX = Math.max(14, Math.min(W - 14, Math.round(o.x + tailSide * (fr.width/2+17))));
+      const tagY = Math.round(o.y + bob + Math.sin(tk*.06+o.ph)*2);
+      g.save();
+      g.strokeStyle='#c2cbe6';g.lineWidth=1;
+      g.beginPath();g.moveTo(attachX,Math.round(o.y+bob));g.lineTo(tagX,tagY-2);g.stroke();
+      g.fillStyle='#293f78';g.fillRect(tagX-9,tagY-11,19,21);
+      g.fillStyle='#aab7e3';g.fillRect(tagX-8,tagY-10,17,1);
+      g.fillStyle='#f8f7ff';g.font="bold 14px 'Microsoft JhengHei','PingFang TC',sans-serif";
+      g.textAlign='center';g.textBaseline='middle';g.fillText(o.ch,tagX,tagY);
+      g.restore();
     }
   });
   // 釣線與釣鉤
   const p = tip(), hk = G.hook;
-  g.fillStyle = "#6b4a2a";
-  for (let i = 0; i <= 12; i++) g.fillRect(Math.round(OX - 12 + i), Math.round(40 - i * (10 / 12)), 2, 2);
   g.fillStyle = "#f4fbff";
   for (let l = 0; l < hk.len; l += 1) g.fillRect(Math.round(OX + Math.sin(hk.ang) * l), Math.round(OY + Math.cos(hk.ang) * l), 1, 1);
+  if (hk.st === "swing" && G.stun <= 0) {
+    g.fillStyle = "rgba(255,255,255,.38)";
+    for (let l = 22; l < 96; l += 9) g.fillRect(Math.round(OX + Math.sin(hk.ang) * l), Math.round(OY + Math.cos(hk.ang) * l), 2, 2);
+  }
   const hx = Math.round(p.x), hy = Math.round(p.y), zap = G.stun > 0 && ((tk >> 2) & 1);
   g.fillStyle = zap ? "#ffe45e" : "#dfe8f2";
   g.fillRect(hx - 1, hy, 2, 6); g.fillRect(hx - 1, hy + 5, 6, 2); g.fillRect(hx + 4, hy + 2, 2, 5);
@@ -1933,6 +2136,7 @@ function draw() {
     g.strokeStyle = "rgba(200,225,255," + (.45 + .2 * Math.sin(tk * .2)) + ")"; g.lineWidth = 1;
     g.beginPath(); g.arc(hx + 1, hy + 4, 14 + ((tk >> 3) & 1) * 2, 0, 6.283); g.stroke();
   }
+  G.rings.forEach(r => { g.strokeStyle = "rgba(255,255,255," + (1 - r.t / .4).toFixed(2) + ")"; g.lineWidth = 1; g.beginPath(); g.arc(r.x, r.y, 4 + r.t * 70, 0, 6.283); g.stroke(); });
   G.fx.forEach(q => { g.fillStyle = q.c; const s = q.sz || 3; g.fillRect(Math.round(q.x), Math.round(q.y), s, s); });
   if (G.gold > 0) {
     g.fillStyle = "rgba(255,214,102," + (.10 + .05 * Math.sin(tk * .1)) + ")"; g.fillRect(0, SEA, W, H - SEA);
@@ -1944,14 +2148,25 @@ function draw() {
     g.fillStyle = "#6f7f93"; g.font = "12px DotGothic16, sans-serif"; g.textAlign = "center";
     g.fillText("章魚噴墨！海底一片漆黑（" + Math.ceil(G.ink) + "）", W / 2, SEA + 40);
   }
-  // 小船與漁夫
-  g.drawImage(BOAT, OX - 34, SEA + 2 - BOAT.height + ((tk >> 5) & 1));
+  // 小船與漁夫（漁夫已畫在船圖裡，魚竿從他手上接到釣線起點）
+  const boatBob = ((tk >> 5) & 1), boatX = OX - 40, boatY = SEA + 3 - BOAT.height + boatBob;
+  g.drawImage(BOAT, boatX, boatY);
+  const hx0 = OX - 8, hy0 = boatY + 12;
+  g.fillStyle = "#8a6b4a";
+  for (let i = 0; i <= 14; i++) g.fillRect(Math.round(hx0 + i * 8 / 14), Math.round(hy0 + (OY - hy0) * i / 14), 2, 2);
   g.fillStyle = "#e8f7ff";
   for (let x = OX - 38; x < OX + 34; x += 4) g.fillRect(x, SEA - 1 + Math.round(Math.sin((x + tk * 1.2) * .1) * 1.5), 4, 3);
+  if (G.t <= 10) {
+    g.strokeStyle = "rgba(255,120,140," + (.25 + .25 * Math.sin(tk * .25)).toFixed(2) + ")"; g.lineWidth = 6; g.strokeRect(0, 0, W, H);
+    g.fillStyle = "rgba(255,225,230,.9)"; g.font = "bold 13px DotGothic16, sans-serif"; g.textAlign = "center";
+    g.fillText("最後 " + Math.ceil(G.t) + " 秒！", W / 2, SEA + 14);
+  }
   if (G.flash > 0) { g.fillStyle = "rgba(210,170,255," + Math.min(.5, G.flash) + ")"; g.fillRect(0, 0, W, H); }
   // 狀態列
   g.textAlign = "left"; g.font = "12px DotGothic16, sans-serif";
   let cy = 60;
+  g.fillStyle="rgba(18,37,75,.55)";g.fillRect(6,58,61,16);g.fillStyle="#e4e9ff";g.fillText(seaTheme(tk).name+"海域",11,70);
+  cy += 18;
   const chip = (s, col) => { const w = Math.ceil(g.measureText(s).width) + 12; g.fillStyle = "rgba(21,30,74,.86)"; g.fillRect(6, cy, w, 17); g.fillStyle = col; g.fillText(s, 12, cy + 13); cy += 21; };
   if (G.combo >= 2) chip("連擊 " + G.combo + " COMBO", "#f1dbff");
   if (G.gold > 0) chip("黃金時刻 ×2　" + Math.ceil(G.gold) + " 秒", "#ffe45e");
@@ -1960,7 +2175,7 @@ function draw() {
   if (G.fast > 0) chip("急速收線　" + Math.ceil(G.fast) + " 秒", "#ffb7a1");
   if (G.stun > 0) chip("暈眩中…", "#e7c9ff");
   g.font = "11px DotGothic16, sans-serif"; g.textAlign = "center";
-  G.txt.forEach(t => { g.globalAlpha = Math.min(1, t.life * 2); g.fillStyle = "#000"; g.fillText(t.s, t.x + 1, t.y + 1); g.fillStyle = t.c; g.fillText(t.s, t.x, t.y); });
+  G.txt.forEach(t => { g.globalAlpha = Math.min(1, t.life * 2); g.fillStyle = "#283d6a"; g.fillText(t.s, t.x + 1, t.y + 1); g.fillStyle = t.c; g.fillText(t.s, t.x, t.y); });
   g.globalAlpha = 1;
   if (G.paused) { g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, 0, W, H); g.fillStyle = "#ffd23f"; g.font = "20px DotGothic16, sans-serif"; g.fillText("暫停中", W / 2, H / 2); }
   g.restore();
@@ -1969,7 +2184,8 @@ function startGame() {
   const mine = G = {
     t: S.bank, objs: [], fx: [], txt: [], hook: { ang: 0, dir: 1, len: MINLEN, st: "swing", obj: null, got: false, wet: false },
     ink: 0, combo: 0, gold: 0, goldIn: 22 + Math.random() * 8, mag: 0, dbl: 0, fast: 0, stun: 0, shake: 0, flash: 0,
-    words: LESSONS[S.lesson].words || [], crab: { x: 70, d: 1 },
+    dayStage: (()=>{const h=new Date().getHours();return h>=5&&h<10?0:h>=10&&h<17?1:h>=17&&h<20?2:3;})(),
+    words: LESSONS[S.lesson].words || [], crab: { x: 70, d: 1 }, rings: [], lastTick: 99,
     run: true, paused: false, last: performance.now(), spawnT: 0, trashT: 0, chestT: 0, tick: 0
   };
   S.score = 0; S.caught = {}; S.learned = []; S.maxCombo = 0;
@@ -1977,7 +2193,8 @@ function startGame() {
   for (let i = 0; i < 4; i++) spawn(i % 2 ? "t1" : "t2");
   spawn("ch");
   show("game");
-  $("#hScore").textContent = "0"; $("#hTime").textContent = fmt(G.t); $("#btnPause").textContent = "暫停";
+  AUDIO.refresh();
+  $("#hScore").textContent = "0"; $("#hTime").textContent = fmt(G.t); $("#hTime").style.color = ""; $("#btnPause").textContent = "暫停";
   cv.focus({ preventScroll: true });
   (function loop(ts) {
     if (G !== mine || !mine.run) return;
@@ -1987,7 +2204,7 @@ function startGame() {
   })(performance.now());
 }
 function launch() {
-  if (G && G.run && !G.paused && G.stun <= 0 && G.hook.st === "swing") { G.hook.st = "out"; G.hook.got = false; G.hook.wet = false; }
+  if (G && G.run && !G.paused && G.stun <= 0 && G.hook.st === "swing") { AUDIO.ready(); AUDIO.play("cast"); G.hook.st = "out"; G.hook.got = false; G.hook.wet = false; }
 }
 function togglePause(force) {
   if (!G || !G.run) return;
@@ -1995,6 +2212,8 @@ function togglePause(force) {
   $("#btnPause").textContent = G.paused ? "繼續" : "暫停";
 }
 function endGame(noTime) {
+  AUDIO.play("end");
+  $("#hTime").style.color = "";
   if (G) G.run = false;
   if (noTime) { S.score = 0; S.caught = {}; S.learned = []; S.maxCombo = 0; }
   S.bank = 0; drawBank();
@@ -2323,6 +2542,9 @@ $("#btnTeacher").addEventListener("click", teacherConfirm);
 $("#btnToQuiz").addEventListener("click", startQuiz);
 $("#btnNext").addEventListener("click", nextQuestion);
 $("#btnPause").addEventListener("click", () => togglePause());
+$("#btnSound").addEventListener("click", () => AUDIO.setEnabled(!AUDIO.isEnabled()));
+$("#soundVolume").addEventListener("input", e => AUDIO.setVolume(e.target.value / 100));
+AUDIO.refresh();
 $("#btnAgain").addEventListener("click", resetFlow);
 cv.addEventListener("pointerdown", e => { e.preventDefault(); launch(); });
 document.addEventListener("keydown", e => {
