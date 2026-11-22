@@ -1490,42 +1490,61 @@ $("#btnReset").addEventListener("click", () => {
 function browserSpeech() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return null;
-  let rec = null, state = "idle", stopping = false, onP = () => {}, onF = () => {}, onS = () => {}, endWaiters = [];
+  let rec = null, state = "idle", wantOn = false, onP = () => {}, onF = () => {}, onS = () => {};
+  let lastInterim = "", endWaiters = [], restarts = [], fatal = null;
   const set = (s, reason) => { state = s; onS(reason ? { state: s, reason } : { state: s }); };
+  const flush = () => { if (lastInterim) { const t = lastInterim; lastInterim = ""; onP({ text: "" }); onF({ text: t }); } };
+  const release = () => { const w = endWaiters; endWaiters = []; w.forEach(f => f()); };
+  function open(resolveStart, rejectStart) {
+    let opened = false;
+    rec = new SR(); rec.lang = "zh-TW"; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+    rec.onstart = () => { if (!opened) { opened = true; if (state !== "listening") set("listening"); resolveStart && resolveStart(); } };
+    rec.onresult = ev => {
+      let interim = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const r = ev.results[i];
+        if (r.isFinal) { lastInterim = ""; onP({ text: "" }); onF({ text: r[0].transcript }); }
+        else interim += r[0].transcript;
+      }
+      lastInterim = interim; if (interim) onP({ text: interim });
+    };
+    rec.onerror = ev => {
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") fatal = "not_granted";
+      else if (ev.error === "network" || ev.error === "audio-capture" || ev.error === "language-not-supported") fatal = "upstream_error";
+      // "no-speech" and "aborted" are normal pauses: the session simply restarts
+    };
+    rec.onend = () => {
+      flush();
+      if (wantOn && !fatal) {
+        const now = Date.now(); restarts = restarts.filter(t => now - t < 5000); restarts.push(now);
+        if (restarts.length > 8) fatal = "upstream_error";   // restarting in a tight loop: give up
+        else { setTimeout(() => { if (wantOn && !fatal) { try { open(); } catch (e) { fatal = "upstream_error"; finish(); } } else finish(); }, 120); return; }
+      }
+      if (!opened && rejectStart) rejectStart({ code: fatal || "upstream_error", message: "no start" });
+      finish();
+    };
+    rec.start();
+  }
+  function finish() {
+    const reason = fatal || (wantOn ? "viewer_stopped" : "stopped");
+    wantOn = false; lastInterim = "";
+    if (state !== "idle") set("idle", reason);
+    release();
+  }
   return {
     start() {
       return new Promise((resolve, reject) => {
         if (state !== "idle") { resolve(); return; }
-        let opened = false; stopping = false;
-        rec = new SR(); rec.lang = "zh-TW"; rec.continuous = true; rec.interimResults = true;
-        rec.onstart = () => { opened = true; set("listening"); resolve(); };
-        rec.onresult = ev => {
-          let interim = "";
-          for (let i = ev.resultIndex; i < ev.results.length; i++) {
-            const r = ev.results[i];
-            if (r.isFinal) { onP({ text: "" }); onF({ text: r[0].transcript }); } else interim += r[0].transcript;
-          }
-          if (interim) onP({ text: interim });
-        };
-        rec.onerror = ev => {
-          const c = ev.error === "not-allowed" || ev.error === "service-not-allowed" ? "not_granted" : ev.error === "no-speech" || ev.error === "aborted" ? null : "upstream_error";
-          if (c && !opened) reject({ code: c, message: ev.error });
-          if (c) rec._err = c;
-        };
-        rec.onend = () => {
-          const reason = stopping ? "stopped" : rec._err || "viewer_stopped";
-          if (!opened) reject({ code: rec._err || "upstream_error", message: "no start" });
-          set("idle", reason);
-          endWaiters.forEach(f => f()); endWaiters = [];
-        };
-        try { rec.start(); } catch (e) { reject({ code: "upstream_error", message: String(e) }); }
+        wantOn = true; fatal = null; restarts = []; lastInterim = "";
+        try { open(resolve, reject); } catch (e) { wantOn = false; reject({ code: "upstream_error", message: String(e) }); }
       });
     },
     stop() {
       return new Promise(res => {
-        if (state === "idle") { res(); return; }
-        stopping = true; endWaiters.push(res);
-        try { rec.stop(); } catch (e) { res(); }
+        if (state === "idle" && !wantOn) { res(); return; }
+        wantOn = false; endWaiters.push(res);
+        try { rec.stop(); } catch (e) { finish(); }
+        setTimeout(() => { if (state !== "idle") finish(); else release(); }, 2500);
       });
     },
     active: () => state !== "idle",
