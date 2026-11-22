@@ -137,6 +137,15 @@ details{background:#f5f6fb;border:1px solid #dce1ef;border-radius:12px;padding:1
 #s-game .btn.alt{background:#dce1f8;color:#25345c}
 @media(max-width:480px){.wrap{gap:14px}.steps li{font-size:.88rem;padding:10px 3px}.panel{border-radius:14px}.btn{padding:10px 13px}.opts.grid .opt{font-size:1.55rem}}
 
+
+/* 海底探險：只調整釣魚關卡的呈現 */
+#s-game{position:relative;overflow:hidden;background:linear-gradient(165deg,#172b56,#322d69 80%);border-color:#7273b9}
+#s-game::before{content:"PIXEL OCEAN · 海底探險";display:block;font:700 12px/1.5 ui-monospace,monospace;letter-spacing:.18em;color:#d6d5ff;margin-bottom:12px}
+#s-game .hud{background:#101d43;border:1px solid #5967a1;border-radius:12px;padding:12px 14px;justify-content:space-between}
+#s-game #cv{border:6px solid #111d3c;border-radius:12px;box-shadow:0 0 0 2px #7785bd,0 14px 30px #0a123c88}
+#s-game .legend{background:#15254b;border-radius:12px;padding:12px;gap:10px 16px}
+#s-game .legend li{background:#263964;border:1px solid #465a8b;padding:5px 8px;border-radius:8px}
+#s-game .hint{font-size:.96rem;line-height:1.7}
 </style>
 
 </head>
@@ -235,7 +244,7 @@ details{background:#f5f6fb;border:1px solid #dce1ef;border-radius:12px;padding:1
       <button class="btn alt sm" id="btnPause">暫停</button>
     </div>
     <canvas id="cv" width="400" height="300" tabindex="0" aria-label="釣魚遊戲畫面，點一下或按空白鍵放下釣鉤"></canvas>
-    <p class="hint">點一下畫面或按空白鍵放下釣鉤。釣起河豚會爆炸，把附近的垃圾炸掉；釣到章魚，海底會黑五秒；寶箱藏著驚喜。</p>
+    <p class="hint">點擊海面或按空白鍵放下釣鉤。連續釣到魚會累積連擊加分；國字魚可以複習生字；小心水母會電到釣竿。河豚炸垃圾、章魚噴墨，寶箱有磁鐵、雙倍分數、急速收線，還有定時出現的黃金時刻（分數 ×2）。</p>
     <ul class="legend" id="legend"></ul>
   </section>
 
@@ -244,6 +253,7 @@ details{background:#f5f6fb;border:1px solid #dce1ef;border-radius:12px;padding:1
     <div class="big" id="endScore">0</div>
     <p id="endBest"></p>
     <ul class="tally" id="tally"></ul>
+    <p class="sub" id="learned" hidden></p>
     <div class="row"><button class="btn" id="btnAgain">再讀一課，賺更多時間</button></div>
   </section>
 
@@ -1337,7 +1347,7 @@ let LESSONS = (() => {
     const idx = updated.findIndex(item => item.title === lesson.title);
     if (idx < 0) updated.push(lesson);
     else if (lesson.title === "第九課　請到我的家鄉來") {
-      updated[idx] = { ...updated[idx], text: lesson.text };
+      updated[idx] = { ...updated[idx], text: lesson.text, words: lesson.words };
     }
   }
   return updated;
@@ -1577,22 +1587,56 @@ function nextQuestion() {
 }
 
 /* ---------- Pixel sprites ---------- */
-function mk(map, pal, c) {
-  const h = map.length, w = Math.max(...map.map(r => r.length));
-  const cv = document.createElement("canvas"); cv.width = w * c; cv.height = h * c;
+// 自動加上深色外框與上亮下暗的陰影，讓像素圖更有立體感。
+function tint(h, f) {
+  if (!/^#[0-9a-f]{6}$/i.test(h)) return h;
+  const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).map(v => Math.round(f > 0 ? v + (255 - v) * f : v * (1 + f)));
+  return "#" + c.map(v => v.toString(16).padStart(2, "0")).join("");
+}
+function mk(map, pal, c, opt) {
+  opt = opt || {};
+  const rows = map.map(r => [...r]), h0 = rows.length, w0 = Math.max(...rows.map(r => r.length));
+  const cell = (i, j) => (j >= 0 && j < h0 && i >= 0 && i < rows[j].length && pal[rows[j][i]]) ? rows[j][i] : "";
+  const cv = document.createElement("canvas"); cv.width = (w0 + 2) * c; cv.height = (h0 + 2) * c;
   const x = cv.getContext("2d");
-  map.forEach((r, j) => [...r].forEach((ch, i) => { const col = pal[ch]; if (col) { x.fillStyle = col; x.fillRect(i * c, j * c, c, c); } }));
+  const px = (i, j, col) => { x.fillStyle = col; x.fillRect((i + 1) * c, (j + 1) * c, c, c); };
+  for (let j = -1; j <= h0; j++) for (let i = -1; i <= w0; i++) {
+    if (cell(i, j)) continue;
+    if (cell(i - 1, j) || cell(i + 1, j) || cell(i, j - 1) || cell(i, j + 1)) px(i, j, opt.line || "#0b1830");
+  }
+  for (let j = 0; j < h0; j++) for (let i = 0; i < w0; i++) {
+    const ch = cell(i, j); if (!ch) continue;
+    let col = pal[ch];
+    if ("ob".includes(ch) && !opt.flat) {
+      if (!cell(i, j - 1)) col = tint(col, .28); else if (!cell(i, j + 1)) col = tint(col, -.25);
+    }
+    px(i, j, col);
+  }
   return cv;
 }
 const MAPS = {
-  fish: ["...oooo....", "..oooooo..o", ".okoooooooo", "..oobbbb..o", "...oooo...."],
+  fish: ["...oooo.....", ".oooooooo..o", "oowkoooooooo", "ooobbbbbo.oo", ".oobbbbbo...", "...oooo....."],
+  fish2: ["...oooo.....", ".oooooooo...", "oowkoooooooo", "ooobbbbbo.oo", ".oobbbbbo..o", "...oooo....."],
   lantern: ["....y.......", "....y.oooo..", "..oooooooo.o", ".okoooooooo.", "..ooddddoo.o", "...oooooo..."],
+  lantern2: ["....y.......", "....y.oooo..", "..oooooooo..", ".okoooooooo.o", "..ooddddoo..", "...oooooo..o"],
   gold: ["....ooooooo......", "..ooooooooooo..oo", ".okoooooooooooooo", "oooooooooooooo.oo", ".oobbbbbbbbooo..o", "..oooooooooo....."],
+  gold2: ["....ooooooo......", "..ooooooooooo...o", ".okoooooooooooooo", "oooooooooooooo.oo", ".oobbbbbbbbooo.oo", "..oooooooooo....."],
   puff: ["..s.oo.s..", ".oooooooo.", "sokooooos.", "oooooooooo", "obbbbbbbbo", ".oooooooo.", "..s.oo.s.."],
-  octo: ["...oooooo...", "..oooooooo..", ".oooooooooo.", ".owwoooowwo.", ".okkoooookko.", ".oooooooooo.", "..oooooooo..", ".o.oo..oo.o.", "o..o....o..o", "o.o......o.o"],
+  puff2: ["s..oooo..s", ".oooooooo.", "sokooooo.s", "oooooooooo", "obbbbbbbbo", ".oooooooo.", "s..oooo..s"],
+  octo: ["...oooooo...", "..oooooooo..", ".oooooooooo.", ".owwoooowwo.", ".okkoooookko", ".oooooooooo.", "..oooooooo..", ".o.oo..oo.o.", "o..o....o..o", "o.o......o.o"],
+  octo2: ["...oooooo...", "..oooooooo..", ".oooooooooo.", ".owwoooowwo.", ".okkoooookko", ".oooooooooo.", "..oooooooo..", "o.oo....oo.o", ".o.o....o.o.", "..o.o..o.o.."],
   boot: ["..bbbb..", "..bbbb..", "..bbbb..", "..bbbb..", "..bbbbbb", ".bbbbbbb", "bbbbbbbb", "dddddddd"],
   can: [".ggggg.", "sssssss", "ggggggg", "gdgdgdg", "ggggggg", "gdgdgdg", "ggggggg", "sssssss", ".ggggg."],
-  chest: ["..dddddddd..", ".dbbbbbbbbd.", "dbbbbbbbbbbd", "dddddddddddd", "dbbbbyybbbbd", "dbbbbyybbbbd", "dbbbbbbbbbbd", "dddddddddddd"]
+  chest: ["..dddddddd..", ".dbbbbbbbbd.", "dbbbbbbbbbbd", "dddddddddddd", "dbbbbyybbbbd", "dbbbbyybbbbd", "dbbbbbbbbbbd", "dddddddddddd"],
+  jelly: ["..oooooo..", ".oooooooo.", "oowwoooooo", "oooooooooo", ".o.o..o.o.", "o..o.o..o.", ".o..o..o.o"],
+  jelly2: ["..oooooo..", ".oooooooo.", "oowwoooooo", "oooooooooo", "o.o..o.o..", ".o..o.o..o", "o..o..o.o."],
+  star: ["....o....", "...ooo...", "ooooooooo", ".ooooooo.", "..ooooo..", ".ooo.ooo.", ".oo...oo."],
+  lfish: ["....oooooo.....", "..oooooooooo..o", ".oowkooooooooo.", "oooooooooooooo.", "oobbbbbbbbbooo.", ".oobbbbbbbbooo.", "..oooooooooo..o", "....oooooo....."],
+  lfish2: ["....oooooo.....", "..oooooooooo.oo", ".oowkooooooooo.", "oooooooooooooo.", "oobbbbbbbbbooo.", ".oobbbbbbbbooo.", "..oooooooooo...", "....oooooo....."],
+  boat: [".....ccccc.................", "......fff...................", ".....uuuuu..................", ".....uuuuu..................",
+    "..eeeeeeeeeeeeeeeeeeeeeeee..", ".hhhhhhhhhhhhhhhhhhhhhhhhhh.", "..rrrrrrrrrrrrrrrrrrrrrrrr..", "...hhhhhhhhhhhhhhhhhhhhhh...", "....hhhhhhhhhhhhhhhhhhhh...."],
+  crab: [".r.....r.", "r.......r", ".rrrrrrr.", "rrkrrrkrr", ".rrrrrrr.", "r.r.r.r.r"],
+  crab2: [".r.....r.", "r.......r", ".rrrrrrr.", "rrkrrrkrr", ".rrrrrrr.", ".r.r.r.r."]
 };
 const P = (o, b, extra) => Object.assign({ o, b, k: "#0b1220", d: "#12243a", w: "#ffffff", y: "#ffd23f", s: "#e8f3ff", g: "#8d9aa8" }, extra || {});
 const T = {
@@ -1602,14 +1646,23 @@ const T = {
   f4: { n: "黃金魚", spr: "gold", pal: P("#ffc928", "#fff0a0", { d: "#b07a00" }), pts: 200, wt: 3, spd: .55, cnt: 1, deep: 1 },
   pf: { n: "河豚", spr: "puff", pal: P("#e8c75a", "#fff5c8", { s: "#ff6b4a" }), pts: 30, wt: 1.4, spd: .3, cnt: 2, note: "爆炸清垃圾" },
   oc: { n: "章魚", spr: "octo", pal: P("#a64ac9", "#d9a6ee"), pts: 20, wt: 2, spd: .25, cnt: 1, note: "噴墨變黑" },
-  ch: { n: "寶箱", spr: "chest", pal: P("#9a5a22", "#9a5a22", { d: "#4a2c12", b: "#9a5a22" }), pts: 0, wt: 2.3, spd: 0, note: "隨機獎勵" },
+  ch: { n: "寶箱", spr: "chest", pal: P("#9a5a22", "#9a5a22", { d: "#4a2c12", b: "#b8742f" }), pts: 0, wt: 2.3, spd: 0, note: "磁鐵・雙倍・加時" },
   t1: { n: "靴子", spr: "boot", pal: P("#7a5230", "#7a5230", { b: "#7a5230", d: "#3e2a18" }), pts: 0, wt: 3.4, spd: 0, trash: 1, note: "垃圾" },
-  t2: { n: "罐頭", spr: "can", pal: P("#9aa7b4", "#9aa7b4", { d: "#5d6a78" }), pts: 0, wt: 3.4, spd: 0, trash: 1, note: "垃圾" }
+  t2: { n: "罐頭", spr: "can", pal: P("#9aa7b4", "#9aa7b4", { d: "#5d6a78" }), pts: 0, wt: 3.4, spd: 0, trash: 1, note: "垃圾" },
+  jf: { n: "水母", spr: "jelly", pal: P("#c77dff", "#e7c9ff", { w: "#f6e8ff" }), pts: 0, wt: 1, spd: .18, cnt: 1, bob: 14, hazard: 1, note: "電擊暈眩" },
+  sf: { n: "海星", spr: "star", pal: P("#ff8fa3", "#ffd0d9"), pts: 40, wt: 1.6, spd: 0, cnt: 2, floor: 1 },
+  lf: { n: "國字魚", spr: "lfish", pal: P("#2fc4b2", "#b9f3ea"), pts: 50, wt: 1.5, spd: .4, cnt: 1, learn: 1, note: "複習生字" }
 };
-for (const k in T) T[k].img = mk(MAPS[T[k].spr], T[k].pal, 2);
+for (const k in T) {
+  const f = [mk(MAPS[T[k].spr], T[k].pal, 2)];
+  if (MAPS[T[k].spr + "2"]) f.push(mk(MAPS[T[k].spr + "2"], T[k].pal, 2));
+  T[k].frames = f; T[k].img = f[0];
+}
+const BOAT = mk(MAPS.boat, { c: "#ffd23f", f: "#ffd3a8", u: "#5b6fd6", e: "#d9ab68", h: "#8b5a2b", r: "#d94f6b" }, 2);
+const CRAB = [mk(MAPS.crab, { r: "#ff6b6b", k: "#0b1220" }, 2), mk(MAPS.crab2, { r: "#ff6b6b", k: "#0b1220" }, 2)];
 (function legend() {
   const ul = $("#legend");
-  ["f1", "f2", "f3", "f4", "pf", "oc", "ch", "t1"].forEach(k => {
+  ["f1", "f2", "f3", "f4", "sf", "lf", "pf", "oc", "jf", "ch", "t1"].forEach(k => {
     const d = T[k], li = document.createElement("li"), c = document.createElement("canvas");
     const sc = Math.min(1, 26 / d.img.width);
     c.width = Math.max(1, Math.round(d.img.width * sc)); c.height = Math.max(1, Math.round(d.img.height * sc));
@@ -1628,16 +1681,21 @@ let G = null;
 
 function spawn(k) {
   const d = T[k], w = d.img.width, h = d.img.height;
-  const lo = d.trash ? SEA + 80 : d.deep ? SEA + 120 : SEA + 28, hi = H - 20 - h / 2;
+  let lo = d.trash ? SEA + 80 : d.deep ? SEA + 120 : SEA + 28, hi = H - 20 - h / 2;
+  if (d.floor) lo = hi = H - 12 - h / 2 - 1;
+  if (d.bob) { lo = SEA + 40; hi = H - 90; }
   let x = 0, y = 0;
   for (let n = 0; n < 12; n++) {
     x = 16 + w / 2 + Math.random() * (W - 32 - w); y = lo + Math.random() * (hi - lo);
     if (G.objs.every(o => Math.hypot(o.x - x, o.y - y) > 32)) break;
   }
   const v = d.spd ? (Math.random() < .5 ? -1 : 1) * d.spd * (0.8 + Math.random() * .5) : 0;
-  G.objs.push({ k, x, y, w, h, v, caught: false });
+  const o = { k, x, y, y0: y, ph: Math.random() * 6.28, w, h, v, caught: false };
+  if (d.learn) { const wd = G.words[Math.floor(Math.random() * G.words.length)]; o.ch = wd.c; o.word = wd; }
+  G.objs.push(o);
 }
 const count = pred => G.objs.filter(pred).length;
+const canSpawn = k => k !== "lf" || G.words.length > 0;
 function tip() { const h = G.hook; return { x: OX + Math.sin(h.ang) * h.len, y: OY + Math.cos(h.ang) * h.len }; }
 function boom(x, y, n) {
   const cols = ["#fff", "#ffe45e", "#ff9f43", "#ff6b4a"];
@@ -1646,122 +1704,276 @@ function boom(x, y, n) {
     G.fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: .5 + Math.random() * .4, c: cols[i % 4] });
   }
 }
-function note(x, y, s, c) { G.txt.push({ s, x: Math.max(40, Math.min(W - 40, x)), y, life: 1.4, c: c || "#ffe45e" }); }
-function gain(p, x, y) { S.score += p; $("#hScore").textContent = S.score; if (p) note(x, y, "+" + p); }
+function splash(x, y) {
+  for (let i = 0; i < 10; i++) G.fx.push({ x, y, vx: (Math.random() - .5) * 60, vy: -40 - Math.random() * 40, gy: 160, life: .55, c: "#eaf8ff", sz: 2 });
+}
+function note(x, y, s, c) { G.txt.push({ s, x: Math.max(48, Math.min(W - 48, x)), y, life: 1.5, c: c || "#ffe45e" }); }
+const mult = () => (G.gold > 0 || G.dbl > 0) ? 2 : 1;
+function gain(p, x, y) {
+  p *= mult();
+  if (p > 0 && G.combo >= 2) {
+    const bonus = Math.min(100, (G.combo - 1) * 5);
+    p += bonus;
+    note(x, y - 24, "連擊 ×" + G.combo + "！ +" + bonus, "#f2d8ff");
+  }
+  S.score += p; $("#hScore").textContent = S.score; if (p) note(x, y, "+" + p);
+}
+function comboUp(x, y) {
+  G.combo++; if (G.combo > S.maxCombo) S.maxCombo = G.combo;
+  if (G.combo % 5 === 0) { note(x, y - 40, "連擊 " + G.combo + "！太厲害了", "#f2d8ff"); boom(OX, SEA, 18); }
+}
+function comboBreak(x, y) { if (G.combo >= 3) note(x, y, "連擊中斷", "#b7c4de"); G.combo = 0; }
 function removeObj(o) { const i = G.objs.indexOf(o); if (i >= 0) G.objs.splice(i, 1); }
 
 function onCatch(o) {
-  const h = G.hook;
+  const h = G.hook; h.got = true;
   if (o.k === "pf") {
     let n = 0;
     G.objs.slice().forEach(t => { if (T[t.k].trash && Math.hypot(t.x - o.x, t.y - o.y) < 75) { boom(t.x, t.y, 14); removeObj(t); n++; } });
-    boom(o.x, o.y, 34); removeObj(o); h.obj = null;
+    boom(o.x, o.y, 34); removeObj(o); h.obj = null; G.shake = .35;
     S.caught.pf = (S.caught.pf || 0) + 1;
+    comboUp(o.x, o.y);
     gain(T.pf.pts, o.x, o.y - 12);
-    note(o.x, o.y - 26, n ? "砰！炸掉 " + n + " 件垃圾" : "砰！", "#ff9f43");
+    note(o.x, o.y - 26, n ? "砰！炸掉 " + n + " 件垃圾" : "砰！", "#ffb05a");
   } else if (o.k === "oc") {
     G.ink = 5; note(o.x, o.y - 12, "章魚噴墨！", "#d9a6ee");
+  } else if (o.k === "jf") {
+    S.caught.jf = (S.caught.jf || 0) + 1;
+    removeObj(o); h.obj = null;
+    G.stun = 1.6; G.flash = .5; G.shake = .3;
+    comboBreak(o.x, o.y - 14);
+    boom(o.x, o.y, 22);
+    note(o.x, o.y - 14, "觸電！釣竿暈眩", "#e7c9ff");
   }
+}
+function chest(x, y) {
+  const r = Math.random();
+  if (r < .22) { G.t += 10; note(x, y, "寶箱：遊戲時間 +10 秒！", "#8be9a8"); }
+  else if (r < .40) {
+    G.objs.filter(t => T[t.k].trash).forEach(t => { boom(t.x, t.y, 10); removeObj(t); });
+    note(x, y, "寶箱：垃圾全部清空！", "#8be9a8");
+  } else if (r < .58) { gain(100, x, y); note(x, y - 14, "寶箱：大獎！", "#8be9a8"); }
+  else if (r < .72) { G.mag = 10; note(x, y, "寶箱：磁鐵釣鉤 10 秒！", "#8be9a8"); }
+  else if (r < .86) { G.dbl = 10; note(x, y, "寶箱：分數 ×2，10 秒！", "#8be9a8"); }
+  else { G.fast = 10; note(x, y, "寶箱：急速收線 10 秒！", "#8be9a8"); }
+  boom(x, y + 8, 18);
+}
+function learnCatch(o, x, y) {
+  S.learned.push(o.ch);
+  note(x, y - 40, "學會「" + o.word.items[0].replace("□", o.ch) + "」", "#9ff3e4");
 }
 function reward(o) {
   S.caught[o.k] = (S.caught[o.k] || 0) + 1;
   const d = T[o.k], x = OX, y = SEA - 8;
-  if (d.trash) note(x, y, "是垃圾…", "#9bbbd8");
-  else if (o.k === "ch") {
-    const r = Math.floor(Math.random() * 3);
-    if (r === 0) { G.t += 10; note(x, y, "寶箱：遊戲時間 +10 秒！", "#5ee08a"); }
-    else if (r === 1) {
-      const trash = G.objs.filter(t => T[t.k].trash);
-      trash.forEach(t => { boom(t.x, t.y, 10); removeObj(t); });
-      note(x, y, "寶箱：垃圾全部清空！", "#5ee08a");
-    } else { gain(100, x, y); note(x, y - 12, "寶箱：大獎！", "#5ee08a"); }
-  } else gain(d.pts, x, y);
+  if (d.trash) { note(x, y, "是垃圾…", "#b7c4de"); comboBreak(x, y - 14); }
+  else if (o.k === "ch") chest(x, y);
+  else {
+    comboUp(x, y);
+    gain(d.pts, x, y);
+    if (d.learn) learnCatch(o, x, y);
+  }
   removeObj(o);
 }
 function update(dt) {
   const h = G.hook, f = dt * 60;
   G.t -= dt;
   if (G.t <= 0) { G.t = 0; endGame(false); return; }
-  if (G.ink > 0) G.ink -= dt;
+  for (const k of ["ink", "mag", "dbl", "fast", "stun", "shake", "flash", "gold"]) if (G[k] > 0) G[k] = Math.max(0, G[k] - dt);
+  G.goldIn -= dt;
+  if (G.goldIn <= 0 && G.gold <= 0) {
+    G.gold = 8; G.goldIn = 30 + Math.random() * 15;
+    note(W / 2, SEA + 36, "黃金時刻！分數 ×2", "#ffe45e"); boom(W / 2, SEA + 36, 26);
+  }
   G.objs.forEach(o => {
-    if (o.caught || !o.v) return;
+    if (o.caught) return;
+    const d = T[o.k];
+    if (d.bob) o.y = o.y0 + Math.sin(G.tick * .025 + o.ph) * d.bob;
+    if (!o.v) return;
     o.x += o.v * f;
     if (o.x < o.w / 2 + 4) { o.x = o.w / 2 + 4; o.v = Math.abs(o.v); }
     if (o.x > W - o.w / 2 - 4) { o.x = W - o.w / 2 - 4; o.v = -Math.abs(o.v); }
   });
+  G.crab.x += G.crab.d * .18 * f;
+  if (G.crab.x < 24 || G.crab.x > W - 40) G.crab.d *= -1;
+  if (Math.random() < dt * 2.2) {
+    const c = G.objs.filter(o => !T[o.k].trash && !o.caught);
+    if (c.length) { const o = c[Math.floor(Math.random() * c.length)]; G.fx.push({ x: o.x, y: o.y - 4, vx: 0, vy: -16, life: 1.5, c: "#d9f1ff", sz: 2 }); }
+  }
   if (h.st === "swing") {
     h.ang += h.dir * 0.022 * f; h.len = MINLEN;
     if (Math.abs(h.ang) > 1.15) { h.dir *= -1; h.ang = Math.sign(h.ang) * 1.15; }
   } else if (h.st === "out") {
     h.len += 4.2 * f;
     const p = tip();
-    const hit = G.objs.find(o => !o.caught && Math.abs(p.x - o.x) < o.w / 2 + 1 && Math.abs(p.y - o.y) < o.h / 2 + 2);
+    if (!h.wet && p.y > SEA) { h.wet = true; splash(p.x, SEA); }
+    const hit = G.objs.find(o => {
+      if (o.caught) return false;
+      const d = T[o.k], m = (G.mag > 0 && !d.trash && !d.hazard) ? 14 : 0;
+      return Math.abs(p.x - o.x) < o.w / 2 + 1 + m && Math.abs(p.y - o.y) < o.h / 2 + 2 + m * .7;
+    });
     if (hit) { h.obj = hit; hit.caught = true; h.st = "back"; onCatch(hit); }
     else if (p.x < 3 || p.x > W - 3 || p.y > H - 12) h.st = "back";
   } else {
-    h.len -= (h.obj ? 4.2 / T[h.obj.k].wt : 5.5) * f;
+    h.len -= (h.obj ? 4.2 / T[h.obj.k].wt : 5.5) * f * (G.fast > 0 ? 1.8 : 1);
     if (h.obj) { const p = tip(); h.obj.x = p.x; h.obj.y = p.y + h.obj.h / 2 - 2; }
-    if (h.len <= MINLEN) { h.len = MINLEN; h.st = "swing"; if (h.obj) { const o = h.obj; h.obj = null; reward(o); } }
+    if (h.len <= MINLEN) {
+      h.len = MINLEN; h.st = "swing";
+      if (h.obj) { const o = h.obj; h.obj = null; reward(o); }
+      else if (!h.got) comboBreak(OX, SEA - 8);
+    }
   }
   G.spawnT += dt; G.trashT += dt; G.chestT += dt;
   if (G.spawnT > 1.5) {
     G.spawnT = 0;
-    for (const k in T) if (T[k].cnt && count(o => o.k === k) < T[k].cnt) spawn(k);
+    for (const k in T) if (T[k].cnt && canSpawn(k) && count(o => o.k === k) < T[k].cnt) spawn(k);
   }
   if (G.trashT > 9) { G.trashT = 0; if (count(o => T[o.k].trash) < 8) spawn(Math.random() < .5 ? "t1" : "t2"); }
   if (G.chestT > 14) { G.chestT = 0; if (!count(o => o.k === "ch")) spawn("ch"); }
-  G.fx.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; });
+  G.fx.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; if (p.gy) p.vy += p.gy * dt; p.life -= dt; });
   G.fx = G.fx.filter(p => p.life > 0);
   G.txt.forEach(t => { t.y -= 18 * dt; t.life -= dt; });
   G.txt = G.txt.filter(t => t.life > 0);
   $("#hTime").textContent = fmt(G.t);
 }
-function draw() {
-  g.fillStyle = "#8fd8ff"; g.fillRect(0, 0, W, SEA);
-  g.fillStyle = "#fff";
-  [[40, 12, 30, 6], [50, 8, 16, 4], [290, 22, 36, 6], [300, 18, 18, 4]].forEach(r => g.fillRect(r[0], r[1], r[2], r[3]));
-  g.fillStyle = "#ffe45e"; g.fillRect(352, 8, 16, 16);
-  [["#2f86cf", SEA, 112], ["#2573b8", 112, 182], ["#1b5c9b", 182, 246], ["#144a82", 246, H]].forEach(b => { g.fillStyle = b[0]; g.fillRect(0, b[1], W, b[2] - b[1]); });
-  g.fillStyle = "#cdeeff";
-  for (let x = -12; x < W; x += 12) g.fillRect(x + ((G.tick >> 3) % 12), SEA, 6, 2);
-  g.fillStyle = "#e8c37a"; g.fillRect(0, H - 12, W, 12);
-  g.fillStyle = "#c9a15a"; for (let x = 4; x < W; x += 22) g.fillRect(x, H - 6, 3, 2);
-  g.fillStyle = "#3aa55b";
-  [24, 96, 172, 252, 330, 382].forEach(x => { g.fillRect(x, H - 34, 3, 22); g.fillRect(x + 3, H - 26, 3, 14); g.fillRect(x - 3, H - 22, 3, 10); });
-  g.globalAlpha = .35; g.fillStyle = "#fff";
-  for (let i = 0; i < 6; i++) g.fillRect(40 + i * 62, H - ((G.tick * .4 + i * 47) % (H - SEA)), 2, 2);
-  g.globalAlpha = 1;
-  G.objs.forEach(o => {
-    const im = T[o.k].img, x = Math.round(o.x - o.w / 2), y = Math.round(o.y - o.h / 2);
-    if (o.v > 0) { g.save(); g.translate(Math.round(o.x + o.w / 2), 0); g.scale(-1, 1); g.drawImage(im, 0, y); g.restore(); }
-    else g.drawImage(im, x, y);
+function drawBackground(tk) {
+  const sky = ["#5db8f0", "#78c6f5", "#95d4fa", "#b3e2fd", "#cdeeff"], sh = Math.ceil(SEA / 5);
+  sky.forEach((c, i) => { g.fillStyle = c; g.fillRect(-4, i * sh, W + 8, sh); });
+  // 太陽與光芒
+  g.fillStyle = "#ffe97a"; g.fillRect(350, 8, 12, 12); g.fillRect(348, 10, 16, 8); g.fillRect(352, 6, 8, 16);
+  g.fillStyle = "#fff6bf";
+  for (let a = 0; a < 8; a++) {
+    const ang = a * Math.PI / 4 + tk * .01, r = 15 + ((tk >> 4) & 1) * 2;
+    g.fillRect(Math.round(356 + Math.cos(ang) * r) - 1, Math.round(14 + Math.sin(ang) * r) - 1, 3, 3);
+  }
+  // 雲
+  g.fillStyle = "rgba(255,255,255,.9)";
+  [[(tk * .06) % 520 - 70, 8], [(tk * .04 + 230) % 520 - 70, 20]].forEach(([x, y]) => {
+    x = Math.round(x); g.fillRect(x, y + 6, 38, 6); g.fillRect(x + 6, y + 2, 22, 6); g.fillRect(x + 22, y + 4, 16, 6);
   });
+  // 海水（分層）
+  const nb = 10, bh = (H - SEA) / nb, a = [58, 154, 226], z = [14, 48, 104];
+  for (let i = 0; i < nb; i++) {
+    const t = i / (nb - 1);
+    g.fillStyle = "rgb(" + a.map((v, j) => Math.round(v + (z[j] - v) * t)).join(",") + ")";
+    g.fillRect(-4, Math.round(SEA + i * bh), W + 8, Math.ceil(bh) + 1);
+  }
+  // 光束
+  g.save(); g.globalAlpha = .12; g.fillStyle = "#e6f2ff";
+  for (let i = 0; i < 4; i++) {
+    const drift = Math.sin(tk * .008 + i * 1.8) * 15;
+    g.beginPath(); g.moveTo(40 + i * 105 + drift, SEA); g.lineTo(64 + i * 105 + drift, SEA);
+    g.lineTo(132 + i * 105 + drift, H - 12); g.lineTo(20 + i * 105 + drift, H - 12); g.closePath(); g.fill();
+  }
+  g.restore();
+  // 遠景遺跡
+  g.fillStyle = "#16306a";
+  for (const [x, y, w, h] of [[28, 229, 19, 59], [51, 246, 28, 42], [280, 232, 18, 56], [302, 249, 42, 39]]) { g.fillRect(x, y, w, h); g.fillRect(x - 3, y, w + 6, 5); }
+  g.fillStyle = "#27478a";
+  for (const [x, y, w] of [[33, 238, 5], [57, 254, 6], [285, 242, 5], [312, 258, 8]]) g.fillRect(x, y, w, 3);
+  // 背景氣泡
+  for (let i = 0; i < 14; i++) {
+    const x = (i * 79 + 17) % W, y = H - ((tk * (.22 + i % 3 * .11) + i * 37) % (H - SEA));
+    g.fillStyle = i % 3 ? "#8bbbe0" : "#d6d3ff"; g.globalAlpha = .25 + .15 * (i % 3);
+    g.fillRect(Math.round(x + Math.sin(tk * .016 + i) * 5), Math.round(y), i % 4 === 0 ? 3 : 2, i % 4 === 0 ? 3 : 2);
+  }
+  g.globalAlpha = 1;
+  // 沙地
+  g.fillStyle = "#e8c37a"; g.fillRect(0, H - 12, W, 12);
+  g.fillStyle = "#f3d994"; g.fillRect(0, H - 12, W, 2);
+  g.fillStyle = "#c9a15a"; for (let x = 4; x < W; x += 22) g.fillRect(x, H - 6, 3, 2);
+  g.fillStyle = "#7d8fb5"; for (const x of [90, 205, 340]) { g.fillRect(x, H - 17, 14, 6); g.fillRect(x + 3, H - 21, 8, 5); }
+  g.fillStyle = "#fff4e0"; for (const x of [60, 170, 262, 372]) { g.fillRect(x, H - 9, 4, 3); g.fillRect(x + 1, H - 10, 2, 1); }
+  // 珊瑚
+  [[36, "#d86fb3"], [150, "#ff8fa3"], [238, "#b56bd6"], [318, "#ff8fa3"], [374, "#d86fb3"]].forEach(([x, c]) => {
+    g.fillStyle = c; g.fillRect(x, H - 26, 4, 14); g.fillRect(x - 5, H - 32, 4, 10); g.fillRect(x + 5, H - 30, 4, 8); g.fillRect(x - 5, H - 24, 14, 3);
+    g.fillStyle = tint(c, .35); g.fillRect(x, H - 26, 2, 3); g.fillRect(x - 5, H - 32, 2, 2); g.fillRect(x + 5, H - 30, 2, 2);
+  });
+  // 海草（隨水流擺動）
+  [[14, 7], [64, 9], [126, 6], [200, 8], [278, 7], [352, 9], [391, 6]].forEach(([bx, n], i) => {
+    for (let j = 0; j < n; j++) {
+      const sway = Math.round(Math.sin(tk * .03 + j * .45 + i * 1.7) * (1 + j * .3));
+      g.fillStyle = j % 2 ? "#3fbfa0" : "#2f9f8a"; g.fillRect(bx + sway, H - 12 - (j + 1) * 5, 4, 5);
+    }
+  });
+  // 螃蟹
+  g.drawImage(CRAB[(tk >> 4) & 1], Math.round(G.crab.x), H - 12 - CRAB[0].height + 4);
+}
+function draw() {
+  const tk = G.tick;
+  g.save();
+  if (G.shake > 0) g.translate(Math.round((Math.random() - .5) * 5), Math.round((Math.random() - .5) * 5));
+  drawBackground(tk);
+  g.fillStyle = "#cdeeff";
+  for (let x = -12; x < W; x += 12) g.fillRect(x + ((tk >> 3) % 12), SEA, 6, 2);
+  // 魚群與物件
+  G.objs.forEach(o => {
+    const d = T[o.k], fr = d.frames[d.frames.length > 1 ? ((tk >> 4) + Math.floor(o.ph * 3)) & 1 : 0];
+    const bob = (o.caught || d.floor || d.trash || d.bob || !d.spd) ? 0 : Math.round(Math.sin(tk * .08 + o.ph));
+    const x = Math.round(o.x - fr.width / 2), y = Math.round(o.y - fr.height / 2) + bob;
+    const flip = o.v > 0;
+    if (flip) { g.save(); g.translate(Math.round(o.x + fr.width / 2), 0); g.scale(-1, 1); g.drawImage(fr, 0, y); g.restore(); }
+    else g.drawImage(fr, x, y);
+    if (d.learn) {
+      const lx = Math.round(o.x + (flip ? 3 : -3)), ly = Math.round(o.y + 4 + bob);
+      g.fillStyle = "#fffdf4"; g.fillRect(lx - 8, ly - 8, 16, 16); g.fillStyle = "#1c6f66"; g.fillRect(lx - 8, ly - 8, 16, 1); g.fillRect(lx - 8, ly + 7, 16, 1);
+      g.fillStyle = "#16324a"; g.font = "14px DotGothic16, 'PingFang TC', 'Microsoft JhengHei', sans-serif"; g.textAlign = "center"; g.fillText(o.ch, lx, ly + 5);
+    }
+  });
+  // 釣線與釣鉤
   const p = tip(), hk = G.hook;
-  g.fillStyle = "#eaf6ff";
+  g.fillStyle = "#6b4a2a";
+  for (let i = 0; i <= 12; i++) g.fillRect(Math.round(OX - 12 + i), Math.round(40 - i * (10 / 12)), 2, 2);
+  g.fillStyle = "#f4fbff";
   for (let l = 0; l < hk.len; l += 1) g.fillRect(Math.round(OX + Math.sin(hk.ang) * l), Math.round(OY + Math.cos(hk.ang) * l), 1, 1);
-  g.fillStyle = "#cfd8e3"; g.fillRect(Math.round(p.x) - 3, Math.round(p.y), 7, 2); g.fillRect(Math.round(p.x) - 3, Math.round(p.y) + 2, 2, 3); g.fillRect(Math.round(p.x) + 2, Math.round(p.y) + 2, 2, 3);
-  G.fx.forEach(q => { g.fillStyle = q.c; g.fillRect(Math.round(q.x), Math.round(q.y), 3, 3); });
+  const hx = Math.round(p.x), hy = Math.round(p.y), zap = G.stun > 0 && ((tk >> 2) & 1);
+  g.fillStyle = zap ? "#ffe45e" : "#dfe8f2";
+  g.fillRect(hx - 1, hy, 2, 6); g.fillRect(hx - 1, hy + 5, 6, 2); g.fillRect(hx + 4, hy + 2, 2, 5);
+  g.fillStyle = zap ? "#fff" : "#9fb2c8"; g.fillRect(hx, hy, 1, 5);
+  if (G.mag > 0) {
+    g.strokeStyle = "rgba(200,225,255," + (.45 + .2 * Math.sin(tk * .2)) + ")"; g.lineWidth = 1;
+    g.beginPath(); g.arc(hx + 1, hy + 4, 14 + ((tk >> 3) & 1) * 2, 0, 6.283); g.stroke();
+  }
+  G.fx.forEach(q => { g.fillStyle = q.c; const s = q.sz || 3; g.fillRect(Math.round(q.x), Math.round(q.y), s, s); });
+  if (G.gold > 0) {
+    g.fillStyle = "rgba(255,214,102," + (.10 + .05 * Math.sin(tk * .1)) + ")"; g.fillRect(0, SEA, W, H - SEA);
+    g.fillStyle = "#fff7c8";
+    for (let i = 0; i < 16; i++) g.fillRect(Math.round((i * 53 + tk * .5 * (1 + i % 3 * .3)) % W), Math.round(SEA + (i * 29 + tk * .7) % (H - SEA)), 2, 2);
+  }
   if (G.ink > 0) {
     g.globalAlpha = G.ink < .6 ? G.ink / .6 : 1; g.fillStyle = "#000"; g.fillRect(0, SEA, W, H - SEA); g.globalAlpha = 1;
     g.fillStyle = "#6f7f93"; g.font = "12px DotGothic16, sans-serif"; g.textAlign = "center";
     g.fillText("章魚噴墨！海底一片漆黑（" + Math.ceil(G.ink) + "）", W / 2, SEA + 40);
   }
-  g.fillStyle = "#8b5a2b"; g.fillRect(OX - 32, SEA - 10, 56, 6); g.fillRect(OX - 26, SEA - 4, 44, 4);
-  g.fillStyle = "#d9482b"; g.fillRect(OX - 32, SEA - 12, 56, 2);
-  g.fillStyle = "#f4e3b2"; g.fillRect(OX - 24, SEA - 26, 14, 14); g.fillStyle = "#7fd0ff"; g.fillRect(OX - 21, SEA - 23, 8, 6);
-  g.fillStyle = "#5a3b1a"; for (let i = 0; i <= 14; i++) g.fillRect(OX - 14 + i, Math.round(SEA - 12 - i * (10 / 14)), 2, 2);
+  // 小船與漁夫
+  g.drawImage(BOAT, OX - 34, SEA + 2 - BOAT.height + ((tk >> 5) & 1));
+  g.fillStyle = "#e8f7ff";
+  for (let x = OX - 38; x < OX + 34; x += 4) g.fillRect(x, SEA - 1 + Math.round(Math.sin((x + tk * 1.2) * .1) * 1.5), 4, 3);
+  if (G.flash > 0) { g.fillStyle = "rgba(210,170,255," + Math.min(.5, G.flash) + ")"; g.fillRect(0, 0, W, H); }
+  // 狀態列
+  g.textAlign = "left"; g.font = "12px DotGothic16, sans-serif";
+  let cy = 60;
+  const chip = (s, col) => { const w = Math.ceil(g.measureText(s).width) + 12; g.fillStyle = "rgba(21,30,74,.86)"; g.fillRect(6, cy, w, 17); g.fillStyle = col; g.fillText(s, 12, cy + 13); cy += 21; };
+  if (G.combo >= 2) chip("連擊 " + G.combo + " COMBO", "#f1dbff");
+  if (G.gold > 0) chip("黃金時刻 ×2　" + Math.ceil(G.gold) + " 秒", "#ffe45e");
+  if (G.dbl > 0) chip("雙倍分數　" + Math.ceil(G.dbl) + " 秒", "#8be9a8");
+  if (G.mag > 0) chip("磁鐵釣鉤　" + Math.ceil(G.mag) + " 秒", "#a9d4ff");
+  if (G.fast > 0) chip("急速收線　" + Math.ceil(G.fast) + " 秒", "#ffb7a1");
+  if (G.stun > 0) chip("暈眩中…", "#e7c9ff");
   g.font = "11px DotGothic16, sans-serif"; g.textAlign = "center";
   G.txt.forEach(t => { g.globalAlpha = Math.min(1, t.life * 2); g.fillStyle = "#000"; g.fillText(t.s, t.x + 1, t.y + 1); g.fillStyle = t.c; g.fillText(t.s, t.x, t.y); });
   g.globalAlpha = 1;
   if (G.paused) { g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, 0, W, H); g.fillStyle = "#ffd23f"; g.font = "20px DotGothic16, sans-serif"; g.fillText("暫停中", W / 2, H / 2); }
+  g.restore();
 }
 function startGame() {
   const mine = G = {
-    t: S.bank, objs: [], fx: [], txt: [], hook: { ang: 0, dir: 1, len: MINLEN, st: "swing", obj: null },
-    ink: 0, run: true, paused: false, last: performance.now(), spawnT: 0, trashT: 0, chestT: 0, tick: 0
+    t: S.bank, objs: [], fx: [], txt: [], hook: { ang: 0, dir: 1, len: MINLEN, st: "swing", obj: null, got: false, wet: false },
+    ink: 0, combo: 0, gold: 0, goldIn: 22 + Math.random() * 8, mag: 0, dbl: 0, fast: 0, stun: 0, shake: 0, flash: 0,
+    words: LESSONS[S.lesson].words || [], crab: { x: 70, d: 1 },
+    run: true, paused: false, last: performance.now(), spawnT: 0, trashT: 0, chestT: 0, tick: 0
   };
-  S.score = 0; S.caught = {};
-  for (const k in T) for (let i = 0; i < (T[k].cnt || 0); i++) spawn(k);
+  S.score = 0; S.caught = {}; S.learned = []; S.maxCombo = 0;
+  for (const k in T) if (canSpawn(k)) for (let i = 0; i < (T[k].cnt || 0); i++) spawn(k);
   for (let i = 0; i < 4; i++) spawn(i % 2 ? "t1" : "t2");
   spawn("ch");
   show("game");
@@ -1774,7 +1986,9 @@ function startGame() {
     if (G === mine && mine.run) { draw(); requestAnimationFrame(loop); }
   })(performance.now());
 }
-function launch() { if (G && G.run && !G.paused && G.hook.st === "swing") G.hook.st = "out"; }
+function launch() {
+  if (G && G.run && !G.paused && G.stun <= 0 && G.hook.st === "swing") { G.hook.st = "out"; G.hook.got = false; G.hook.wet = false; }
+}
 function togglePause(force) {
   if (!G || !G.run) return;
   G.paused = typeof force === "boolean" ? force : !G.paused;
@@ -1782,7 +1996,7 @@ function togglePause(force) {
 }
 function endGame(noTime) {
   if (G) G.run = false;
-  if (noTime) { S.score = 0; S.caught = {}; }
+  if (noTime) { S.score = 0; S.caught = {}; S.learned = []; S.maxCombo = 0; }
   S.bank = 0; drawBank();
   const best = ls.get("best", 0);
   if (S.score > best) ls.set("best", S.score);
@@ -1791,7 +2005,12 @@ function endGame(noTime) {
   $("#endBest").textContent = noTime ? "測驗答錯太多，時間都扣光了。再讀幾遍課文，就能換回遊戲時間。"
     : S.score > best ? "新紀錄！" : "這台裝置的最高分：" + best + " 分";
   const entries = Object.entries(S.caught);
-  $("#tally").innerHTML = entries.length ? entries.map(e => `<li>${T[e[0]].n} ×${e[1]}</li>`).join("") : "<li>這次沒有釣到東西</li>";
+  let html = entries.length ? entries.map(e => `<li>${T[e[0]].n} ×${e[1]}</li>`).join("") : "<li>這次沒有釣到東西</li>";
+  if (S.maxCombo >= 2) html += `<li>最高連擊 ×${S.maxCombo}</li>`;
+  $("#tally").innerHTML = html;
+  const learned = [...new Set(S.learned || [])];
+  $("#learned").hidden = !learned.length;
+  $("#learned").textContent = learned.length ? "今天釣到的複習國字：" + learned.join("　") : "";
   show("end");
 }
 
