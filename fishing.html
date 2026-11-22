@@ -96,6 +96,47 @@ details .row{margin-top:8px}
 #hw svg{display:block;touch-action:none}
 @media (prefers-reduced-motion:reduce){.btn:active:not([disabled]){transform:none}}
 @media (max-width:480px){h1{font-size:1.5rem}.passage{font-size:1.15rem}}
+
+/* 2026 visual refresh — warm paper, periwinkle, indigo and plum; no green or orange. */
+:root{--ink:#202c4c;--deep:#ffffff;--sea:#6476ba;--foam:#dce2f7;--sun:#f3d78a;--coral:#8a67ae;--text:#263453;--mute:#63708b;--good:#435fa4;--bad:#b34463;--line:#aebbd7;color-scheme:light}
+body{background:radial-gradient(circle at 10% 4%,#e9e5f8 0,transparent 35%),linear-gradient(155deg,#f8f6f2,#edf1fa 68%,#f5f0fa);color:var(--text)}
+.wrap{max-width:900px;gap:20px}
+.top{padding:14px 4px 4px}
+h1{font-family:var(--f-b);font-size:clamp(1.65rem,4vw,2.25rem);font-weight:800;color:#33456f;text-shadow:none;letter-spacing:.055em}
+h2{font-family:var(--f-b);font-size:clamp(1.3rem,3vw,1.65rem);font-weight:750;color:#374a78;letter-spacing:.02em}
+.bank{background:#fff;border:1px solid #d7ddec;border-radius:16px;box-shadow:0 6px 18px #25385c12;padding:10px 16px}
+.bank span{color:#65718b}.bank b{color:#4c5e9a;font-family:var(--f-b);font-weight:800;font-size:1.25rem}
+.steps{gap:10px}.steps li{font-family:var(--f-b);font-weight:700;background:#e7eaf5;color:#77809a;border:1px solid #d8deec;border-radius:12px;padding:12px 6px}
+.steps li.on{background:#4c5f98;color:white;border-color:#4c5f98;box-shadow:0 5px 14px #364a8425}.steps li.done{background:#e9e6f5;color:#62518d;border-color:#c9c2e1}
+.panel{background:#fffefa;border:1px solid #d9deea;border-radius:20px;box-shadow:0 12px 36px #33426313;padding:clamp(18px,4vw,34px)}
+label,.rounds,.qhead,.hint,.legend,.sub,.teacher p{color:#63708b}
+select,input{background:#fff;color:#29385c;border:1.5px solid #cbd3e7;border-radius:10px;padding:9px 12px}
+.passage{font-family:var(--f-b);background:#fffdf8;color:#25324e;border:1px solid #e0dfeb;border-left:5px solid #8d8bc4;border-radius:12px;padding:clamp(16px,4vw,28px);font-size:clamp(1.2rem,2.8vw,1.4rem);line-height:2.15;letter-spacing:.045em;box-shadow:inset 0 2px 9px #42507207}
+#segmentInfo{color:#655995!important;font-weight:700}
+.dot{border:2px solid #9da9cf;border-radius:5px}.dot.on{background:#6d73ad;border-color:#6d73ad}
+.live{background:#f2f4fb;border:1px dashed #b5c0dc;border-radius:10px;color:#55617d;padding:13px 16px}.live.hot{background:#f0edfa;color:#263453;border-color:#8f7fba}
+.btn{font-family:var(--f-b);font-weight:750;font-size:1rem;background:#4e619c;color:#fff;border:1px solid #465a95;border-radius:12px;box-shadow:0 4px 0 #344474;padding:11px 18px;transition:background .15s,transform .15s}
+.btn:hover:not([disabled]){background:#3e508b}.btn:active:not([disabled]){box-shadow:0 1px 0 #344474}
+.btn.alt{background:#e7eaf8;color:#374a7b;border-color:#cbd3ed;box-shadow:0 4px 0 #b7bfdc}.btn.alt:hover:not([disabled]){background:#d9def3}
+.btn.rec{background:#7561a4;color:#fff;border-color:#675393;box-shadow:0 4px 0 #4d3e78}.btn.rec:hover:not([disabled]){background:#66518f}
+.btn[disabled]{background:#e1e5ee;color:#929db0;border-color:#d6dce9;box-shadow:0 4px 0 #cbd1df}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,canvas:focus-visible{outline:3px solid #a28ac9;outline-offset:3px}
+.msg.good{color:#375a9d}.msg.bad{color:#b34463}
+details{background:#f5f6fb;border:1px solid #dce1ef;border-radius:12px;padding:12px 16px}summary{color:#4b5c87;font-weight:650}
+.opt{font-family:var(--f-b);font-weight:650;background:#f7f8fc;color:#2c395a;border:1.5px solid #d6ddef;border-radius:12px;padding:15px 18px;transition:background .15s,border-color .15s}
+.opt:hover:not([disabled]){background:#ebedfa;border-color:#8798ca}.opt.good{background:#e1e8fb;border-color:#5670b5;color:#283e7c}.opt.bad{background:#f9e5ed;border-color:#c27591;color:#7e3150}
+.mode{font-family:var(--f-b);background:#f8f7fd;color:#293858;border:1.5px solid #d9d4ee;border-radius:14px;box-shadow:0 5px 0 #e4e0f2;padding:18px;gap:8px}.mode:hover{background:#eeebfa;border-color:#aaa0d4}.mode b{color:#584b8e}.mode span{color:#67708a}
+.phrase{font-family:var(--f-b);font-weight:750;color:#2f3c62}.phrase u{color:#6352a0;border-bottom-color:#9a88cb}.zy{color:#615b9b}
+#hw{border:2px solid #c4cce3;border-radius:10px;background-color:#fff;box-shadow:0 6px 18px #25385c13}
+.teacher textarea{background:#fff;color:#29385c;border:1px solid #cbd3e7;border-radius:10px}
+.big,.hud b{color:#4d5e99}.hud{color:#394a73}
+/* The actual fishing canvas retains its original pixel artwork; its frame and HUD feel arcade-like. */
+#s-game{background:#25345c;border:5px solid #465a91;border-radius:18px;padding:clamp(12px,3vw,22px);box-shadow:0 14px 35px #1c294b28;color:#f1f3ff}
+#s-game .hud{color:#e7e9ff}#s-game .hud b{color:#f4de9b}#s-game .hint,#s-game .legend{color:#d1d9f5}
+#s-game #cv{border:5px solid #121f42;border-radius:8px;box-shadow:0 5px 0 #131f3b}
+#s-game .btn.alt{background:#dce1f8;color:#25345c}
+@media(max-width:480px){.wrap{gap:14px}.steps li{font-size:.88rem;padding:10px 3px}.panel{border-radius:14px}.btn{padding:10px 13px}.opts.grid .opt{font-size:1.55rem}}
+
 </style>
 
 </head>
